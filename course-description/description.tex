@@ -1,0 +1,103 @@
+\documentclass{article}
+\usepackage{baked}
+\usepackage[left=1.5in, right=2in, top=0.45in, bottom=0.45in]{geometry}
+\usepackage{fontspec}
+\setmainfont{Adobe Caslon Pro}
+\usepackage{layout}
+\usepackage[inline]{enumitem}
+\usepackage[]{amsmath}
+\usepackage{amssymb}
+\usepackage{physics}
+\usepackage{notoccite}
+\usepackage{ragged2e}
+\usepackage{graphicx}
+\usepackage{eufrak}
+\usepackage{pdfpages}
+\usepackage{cite}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{bm}
+\pagestyle{empty}
+\begin{document}
+{
+  \fontsize{12pt}{18pt}\selectfont
+  \addfontfeature{Numbers=OldStyle}
+  {\scshape ece}471, GANs for Type\\
+  Advisor: Chris Curro
+}
+\raggedright
+\raggedbottom
+\fontsize{12pt}{16pt}\selectfont 
+\addfontfeature{Numbers=OldStyle}
+
+\begin{description}
+
+\item[Core topics] \hfill
+  
+  \begin{itemize}[leftmargin=-0.25cm]
+  \item Generative adversarial networks
+  \item Bézier polynomials and interpolation
+  \item Fast rasterization techniques on massively parallel computer
+    architectures (graphics processing units, etc.)
+  \item Parametric design
+  \end{itemize}
+
+\item[References] \hfill
+  
+  \begin{itemize}[leftmargin=-0.25cm]
+  \item {\itshape Deep Learning}, Ian Goodfellow and Yoshua Bengio and
+    Aaron Courville, MIT Press, 2016
+  \item {\itshape Bézier and B-Spline Techniques}, Hartmut Prautzsch,
+    Wolfgang Boehm, and Marco Paluszny, Springer, 2002
+  \item {\itshape The Metafont Book}, Donald Knuth, Addison-Wesley
+    Longman, 1986
+  \item {\itshape Lettering \& Type: Creating Letters and Designing
+    Typefaces}, Bruce Willen, Nolen Strals Princeton Architectural
+    Press, 2009
+  \item {\itshape The Anatomy of Type}, Stephen Cole, Harper Collins,
+    2012
+  \end{itemize}
+
+\item[Deliverables] \hfill
+  
+  \begin{itemize}[leftmargin=-0.25cm]
+  \item Core program and associated experiments
+  \item Paper or papers intended to be submitted at a conference such
+    as {\scshape siggraph} (preferred), {\scshape cvpr}, or similar
+  \item Typographic specimens for exhibition at {\scshape eoys}
+  \item Interactive typeface design application for exhibition at
+    {\scshape eoys}
+  \end{itemize}
+    
+\item[Prerequisite] \hfill
+  \begin{itemize}[leftmargin=-0.25cm]
+    \item Either:
+      \begin{itemize}
+      \item Computational Graphs for Machine Learning ({\scshape ece}471) 
+      \item Frequentist Machine Learning ({\scshape ece}414)
+      \end{itemize}
+  \end{itemize}
+  
+\end{description}
+
+We will develop a class and attribute conditional generative
+adversarial network capable of producing vector graphics. No
+generative model with vector graphic output has previously appeared in
+literature. The generative model will be able to produce closed
+shapes, with counter spaces, defined by a variable number of cubic
+Bézier curves. The motivating application for this research is
+algorithmic typeface design.
+
+
+Time permitting, we further intend to develop an interactive typeface
+editing application which will embed a pre-existing typeface into the
+high-level low-dimensional space defined by our generative model. By
+encoding an existing typeface in this way we are able to perform
+vector arithmetic in the embedding space to produce fundamental
+changes in the Bézier space representation of the typeface glyphs.
+
+\end{document}
+
