@@ -24,4 +24,4 @@ gpuenv:
 	)
 
 format:
-	yapf --in-place src/*.py
+	yapf --in-place -r src/
