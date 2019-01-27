@@ -1,10 +1,22 @@
 #!/bin/python3
 
-import argparse
+from absl import app, flags
 from time import time
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+
+FLAGS = flags.FLAGS
+flags.DEFINE_boolean('disable-cuda', False, 'If True, disables CUDA.')
+flags.DEFINE_boolean('display', False, 'If True, displays raster.')
+flags.DEFINE_integer('steps', 128, 'Number of steps.')
+flags.DEFINE_integer('resolution', 256, 'Resolution of raster.')
+flags.DEFINE_float('sigma', 1e-2, 'Standard deviation of Gaussians.')
+flags.DEFINE_enum('method', 'base', ['base', 'base_half'],
+                  'Rasterization method.')
+flags.DEFINE_enum('draw', 'quadratic', ['quadratic', 'cubic', 'char'],
+                  'What to draw.')
+flags.DEFINE_integer('passes', 1, 'Number of passes to make.')
 
 
 def _sample_quadratic_bezier(control_points, steps):
@@ -472,31 +484,20 @@ class Rasterizer(torch.nn.Module):
     """
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--disable-cuda', action='store_true', help='')
-    parser.add_argument('--display', action='store_true', help='')
-    parser.add_argument('--steps', default=128, type=int, help='')
-    parser.add_argument('--resolution', default=256, type=int, help='')
-    parser.add_argument('--sigma', default=1e-2, type=float, help='')
-    parser.add_argument('--method', default='base', help='')
-    parser.add_argument('--draw', default='quadratic', help='')
-    parser.add_argument('--passes', default=1, type=int, help='')
-    args = parser.parse_args()
-
-    use_cuda = torch.cuda.is_available() and not args.disable_cuda
+def main(argv):
+    use_cuda = torch.cuda.is_available() and not FLAGS.disable_cuda
     device = torch.device("cuda" if use_cuda else "cpu")
     print('Using device "{}"'.format(device))
 
     # Set toy control points for testing
-    if args.draw == 'quadratic':
+    if FLAGS.draw == 'quadratic':
         # Shape: [1, 3, 2]
         control_points_ = np.array([[[0.1, 0.1], [0.9, 0.9], [0.5, 0.9]]])
-    elif args.draw == 'cubic':
+    elif FLAGS.draw == 'cubic':
         # Shape: [1, 4, 2]
         control_points_ = np.array([[[1.0, 0.0], [0.21, 0.12], [0.72, 0.83],
                                      [0.0, 1.0]]])
-    elif args.draw == 'char':
+    elif FLAGS.draw == 'char':
         # Shape: [3, 3, 2]
         control_points_ = np.array([
             [[0.1, 0.1], [0.9, 0.9], [0.5, 0.9]],
@@ -510,10 +511,10 @@ if __name__ == '__main__':
         torch.Tensor(control_points_), requires_grad=True)
 
     rasterizer = Rasterizer(
-        resolution=args.resolution,
-        steps=args.steps,
-        sigma=args.sigma,
-        method=args.method)
+        resolution=FLAGS.resolution,
+        steps=FLAGS.steps,
+        sigma=FLAGS.sigma,
+        method=FLAGS.method)
 
     rasterizer.to(device)
     if use_cuda:
@@ -528,7 +529,7 @@ if __name__ == '__main__':
     # Time all computation
     tic_total = time()
 
-    for i in range(args.passes):
+    for i in range(FLAGS.passes):
         # Time forward pass
         tic = time()
         raster = rasterizer.forward(control_points)
@@ -554,19 +555,24 @@ if __name__ == '__main__':
 
     print(
         'forwards:  {:4d} passes in {:7.3f} seconds [{:8.3f} iter/s {:>5.1f} ms/iter].'
-        .format(args.passes, elapsed_forward, args.passes / elapsed_forward,
-                elapsed_forward / args.passes * 1e3))
+        .format(FLAGS.passes, elapsed_forward, FLAGS.passes / elapsed_forward,
+                elapsed_forward / FLAGS.passes * 1e3))
     print(
         'backwards: {:4d} passes in {:7.3f} seconds [{:8.3f} iter/s {:>5.1f} ms/iter].'
-        .format(args.passes, elapsed_backward, args.passes / elapsed_backward,
-                elapsed_backward / args.passes * 1e3))
+        .format(FLAGS.passes, elapsed_backward,
+                FLAGS.passes / elapsed_backward,
+                elapsed_backward / FLAGS.passes * 1e3))
     print(
         'total:     {:4d} passes in {:7.3f} seconds [{:8.3f} iter/s {:>5.1f} ms/iter].'
-        .format(args.passes, elapsed, args.passes / elapsed,
-                elapsed / args.passes * 1e3))
+        .format(FLAGS.passes, elapsed, FLAGS.passes / elapsed,
+                elapsed / FLAGS.passes * 1e3))
     print('memory usage:  {:5d} MB allocated, {:5d} MB cached.'.format(
         int(memory_allocated // 1e6), int(memory_cached // 1e6)))
 
-    if args.display:
+    if FLAGS.display:
         plt.matshow(raster.data.cpu().numpy())
         plt.show()
+
+
+if __name__ == '__main__':
+    app.run(main)

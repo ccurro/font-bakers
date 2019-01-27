@@ -364,3 +364,7 @@ TSWLatexianTemp*
 
 # standalone packages
 *.sta
+
+# OS generated files
+.DS_Store
+.DS_Store?
