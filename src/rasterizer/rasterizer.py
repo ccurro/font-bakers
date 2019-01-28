@@ -171,10 +171,12 @@ class Rasterizer(torch.nn.Module):
         self.sigma = sigma
         self.method = method
 
-        self.gpu = torch.empty(2)
+        # TODO the follow line is required for the `tiled` method
+        # self.gpu = torch.empty(2)
         XX, YY = np.meshgrid(range(self.resolution), range(self.resolution))
-        XX_expanded = XX[np.newaxis, :, :]
-        YY_expanded = YY[np.newaxis, :, :]
+        YY = np.flip(YY)
+        XX_expanded = XX[:, :, np.newaxis]
+        YY_expanded = YY[:, :, np.newaxis]
         self.x_meshgrid = torch.Tensor(XX_expanded / resolution)
         self.y_meshgrid = torch.Tensor(YY_expanded / resolution)
 
@@ -248,12 +250,10 @@ class Rasterizer(torch.nn.Module):
         x_samples = samples[0]
         y_samples = samples[1]
 
-        x_meshgrid_expanded = torch.transpose(
-            self.x_meshgrid.expand(num_samples, self.resolution,
-                                   self.resolution), 0, 2)
-        y_meshgrid_expanded = torch.transpose(
-            self.y_meshgrid.expand(num_samples, self.resolution,
-                                   self.resolution), 0, 2)
+        x_meshgrid_expanded = self.x_meshgrid.expand(
+            self.resolution, self.resolution, num_samples)
+        y_meshgrid_expanded = self.y_meshgrid.expand(
+            self.resolution, self.resolution, num_samples)
 
         raster = torch.exp(
             (-(x_samples - x_meshgrid_expanded)**2 -
@@ -262,7 +262,7 @@ class Rasterizer(torch.nn.Module):
         speeds = torch.norm(derivative_samples, dim=0)
         raster = torch.matmul(raster, speeds)
 
-        return torch.transpose(torch.squeeze(raster), 0, 1)
+        return torch.squeeze(raster)
 
     def _raster_base_half(self, samples, derivative_samples, sigma):
         '''
@@ -293,12 +293,10 @@ class Rasterizer(torch.nn.Module):
         x_samples = samples[0].half()
         y_samples = samples[1].half()
 
-        x_meshgrid_expanded = torch.transpose(
-            self.x_meshgrid.expand(num_samples, self.resolution,
-                                   self.resolution), 0, 2).half()
-        y_meshgrid_expanded = torch.transpose(
-            self.y_meshgrid.expand(num_samples, self.resolution,
-                                   self.resolution), 0, 2).half()
+        x_meshgrid_expanded = self.x_meshgrid.expand(
+            self.resolution, self.resolution, num_samples).half()
+        y_meshgrid_expanded = self.y_meshgrid.expand(
+            self.resolution, self.resolution, num_samples).half()
 
         raster = torch.exp(
             (-(x_samples - x_meshgrid_expanded)**2 -
@@ -307,7 +305,7 @@ class Rasterizer(torch.nn.Module):
         speeds = torch.norm(derivative_samples, dim=0).half()
         raster = torch.matmul(raster, speeds)
 
-        return torch.transpose(torch.squeeze(raster.float()), 0, 1)
+        return torch.squeeze(raster.float())
 
     """
     def _raster_shrunk(self, samples, sigma):
