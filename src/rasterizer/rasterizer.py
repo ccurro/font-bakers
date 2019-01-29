@@ -166,7 +166,7 @@ class Rasterizer(torch.nn.Module):
     def __init__(self, resolution=256, steps=128, sigma=1e-2, method='base'):
         super(Rasterizer, self).__init__()
         self.resolution = resolution
-        self.steps = steps
+        self.steps = torch.linspace(0, 1, steps)
         self.sigma = sigma
         self.method = method
 
@@ -215,11 +215,10 @@ class Rasterizer(torch.nn.Module):
         raster : [resolution, resolution]
             Rastered glyph.
         '''
-        steps = torch.linspace(0, 1, self.steps)
         samples = torch.cat(
-            [sample_bezier(bezier, steps) for bezier in control_points], dim=1)
+            [sample_bezier(bezier, self.steps) for bezier in control_points], dim=1)
         derivative_samples = torch.cat([
-            sample_bezier_derivative(bezier, steps)
+            sample_bezier_derivative(bezier, self.steps)
             for bezier in control_points
         ],
                                        dim=1)
