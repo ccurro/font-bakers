@@ -8,7 +8,6 @@ import torch
 
 FLAGS = flags.FLAGS
 flags.DEFINE_boolean('disable-cuda', False, 'If True, disables CUDA.')
-flags.DEFINE_boolean('display', False, 'If True, displays raster.')
 flags.DEFINE_integer('steps', 128, 'Number of steps.')
 flags.DEFINE_integer('resolution', 256, 'Resolution of raster.')
 flags.DEFINE_float('sigma', 1e-2, 'Standard deviation of Gaussians.')
@@ -566,10 +565,6 @@ def main(argv):
                 elapsed / FLAGS.passes * 1e3))
     print('memory usage:  {:5d} MB allocated, {:5d} MB cached.'.format(
         int(memory_allocated // 1e6), int(memory_cached // 1e6)))
-
-    if FLAGS.display:
-        plt.matshow(raster.data.cpu().numpy())
-        plt.show()
 
 
 if __name__ == '__main__':
