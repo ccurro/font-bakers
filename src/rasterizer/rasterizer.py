@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import torch
 
 FLAGS = flags.FLAGS
-flags.DEFINE_boolean('disable-cuda', False, 'If True, disables CUDA.')
-flags.DEFINE_integer('steps', 128, 'Number of steps.')
-flags.DEFINE_integer('resolution', 256, 'Resolution of raster.')
+flags.DEFINE_boolean('disablecuda', False, 'If True, disables CUDA.')
+flags.DEFINE_integer('steps', 32, 'Number of steps.')
+flags.DEFINE_integer('resolution', 64, 'Resolution of raster.')
 flags.DEFINE_float('sigma', 1e-2, 'Standard deviation of Gaussians.')
 flags.DEFINE_enum('method', 'base', ['base', 'base_half'],
                   'Rasterization method.')
@@ -172,12 +172,28 @@ class Rasterizer(torch.nn.Module):
 
         # TODO the follow line is required for the `tiled` method
         # self.gpu = torch.empty(2)
-        XX, YY = np.meshgrid(range(self.resolution), range(self.resolution))
+        # Padding constants chosen by looking at empirical distribution of
+        # coordinates of Bezier control point from real fonts
+        left_pad = 0.25 * self.resolution
+        right_pad = 1.25 * self.resolution
+        up_pad = 0.8 * self.resolution
+        down_pad = 0.4 * self.resolution
+        mesh_lr = np.linspace(
+            -left_pad,
+            self.resolution + right_pad,
+            num=self.resolution,
+            endpoint=False)
+        mesh_ud = np.linspace(
+            -down_pad,
+            self.resolution + up_pad,
+            num=self.resolution,
+            endpoint=False)
+        XX, YY = np.meshgrid(mesh_lr, mesh_ud)
         YY = np.flip(YY)
         XX_expanded = XX[:, :, np.newaxis]
         YY_expanded = YY[:, :, np.newaxis]
-        self.x_meshgrid = torch.Tensor(XX_expanded / resolution)
-        self.y_meshgrid = torch.Tensor(YY_expanded / resolution)
+        self.x_meshgrid = torch.Tensor(XX_expanded / self.resolution)
+        self.y_meshgrid = torch.Tensor(YY_expanded / self.resolution)
 
         if method == 'base':
             self.raster = self._raster_base
@@ -216,7 +232,8 @@ class Rasterizer(torch.nn.Module):
             Rastered glyph.
         '''
         samples = torch.cat(
-            [sample_bezier(bezier, self.steps) for bezier in control_points], dim=1)
+            [sample_bezier(bezier, self.steps) for bezier in control_points],
+            dim=1)
         derivative_samples = torch.cat([
             sample_bezier_derivative(bezier, self.steps)
             for bezier in control_points

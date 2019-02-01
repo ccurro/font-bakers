@@ -31,7 +31,7 @@ def main(argv):
     if FLAGS.file is None:
         raise ValueError('--file flag not supplied.')
 
-    use_cuda = torch.cuda.is_available() and not FLAGS.disable_cuda
+    use_cuda = torch.cuda.is_available() and not FLAGS.disablecuda
     device = torch.device('cuda' if use_cuda else 'cpu')
     print('Using device "{}"'.format(device))
 
@@ -53,10 +53,6 @@ def main(argv):
     if FLAGS.display == 'lowercase':
         characters_to_display = LOWERCASE_LETTERS
     elif FLAGS.display == 'all':
-        # FIXME remove this exception
-        raise ValueError(
-            'Please don\'t set `--char all` until the rasterizer is faster. -GH'
-        )
         characters_to_display = CHARACTERS
     else:
         characters_to_display = list(FLAGS.display)
@@ -101,7 +97,11 @@ def main(argv):
         sharex=True,
         sharey=True,
     )
-    axarr = axarr.flatten()
+    try:
+        axarr = axarr.flatten()
+    except AttributeError:
+        # There is only one character to display, and `axarr` is just an AxesSubplot
+        axarr = [axarr]
 
     for idx, raster in enumerate(rasters):
         axarr[idx].matshow(raster)
