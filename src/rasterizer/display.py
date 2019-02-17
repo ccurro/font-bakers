@@ -67,10 +67,9 @@ def main(argv):
                 bezier for closed_curve in character_control_points.values()
                 for bezier in closed_curve
             ]
-
             # Rasterize
             character_control_points = torch.autograd.Variable(
-                torch.Tensor(np.array(character_control_points) / 512),
+                torch.Tensor(np.array(character_control_points)),
                 requires_grad=True,
             )
             raster = rasterizer.forward(character_control_points)
