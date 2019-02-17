@@ -1,42 +1,13 @@
-syntax="proto3";
-// ensure you're using the protobuf 3 syntax
-// get protobut 3 from here on ubuntu
-// https://gist.github.com/sofyanhadia/37787e5ed098c97919b8c593f0ec44d8
+syntax="proto2";
 
-// stack all your protobuf structs
-// start from the most base object: the x,y coord 
+message glyph{
+        repeated Font glyph=1;
+}
 message Font {	
     
-    int32 w = 1;
-	int32 x = 2;
-    int32 y = 3;
-	int32 z = 4;
-    bytes b = 5;
-
-    int32 v = 6;
+    optional int32 num_contours=1;
+    repeated float bezier_points=2;
+    repeated int32 contour_locations=3;
+    optional string font_name=4;
+    optional string glyph_name=5;
 }
-// The rest of this file is for ostap's reference
-// three Points define a BezCurve
-/*
-message BezCurve {
-	Point stt = 1;
-	Point off = 2;
-	Point end = 3;
-}
-
-// repeated curves make a counter space
-message CounterSpace {
-	repeated BezCurve curves = 1;
-}
-
-//repeated counter spaces make a glyph
-message Character {
-	repeated CounterSpace counter_space = 1;
-}
-
-//repeated glyphs make a font
-message Font {
-	map<string, Character> glyph = 1;
-}
-*/
-

@@ -3,13 +3,12 @@ from absl import flags, app
 
 FLAGS = flags.FLAGS
 DESIREDGLPYHS = set([
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
-        'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c',
-        'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q',
-        'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'zero', 'one', 'two',
-        'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 
-        'exclam', 'numbersign', 'dollar', 'percent', 'ampersand',
-        'asterisk','question', 'at' 
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+    'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+    't', 'u', 'v', 'w', 'x', 'y', 'z', 'zero', 'one', 'two', 'three', 'four',
+    'five', 'six', 'seven', 'eight', 'nine', 'exclam', 'numbersign', 'dollar',
+    'percent', 'ampersand', 'asterisk', 'question', 'at'
 ])
 
 flags.DEFINE_string("file", None, "input ttx filename")
