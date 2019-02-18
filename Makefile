@@ -3,23 +3,13 @@
 PYTHON = python3.5
 SHELL = bash
 
-cpuvenv:
+venv:
 	( \
-	rm -Rf cpuvenv; \
-	${PYTHON} -m venv cpuvenv; \
-	source cpuvenv/bin/activate; \
+	rm -Rf venv; \
+	${PYTHON} -m venv venv; \
+	source venv/bin/activate; \
 	pip install --upgrade pip; \
-	pip install -r requirements/cpu.txt; \
-	deactivate; \
-	)
-
-gpuenv:
-	( \
-	rm -Rf gpuvenv; \
-	${PYTHON} -m venv gpuvenv; \
-	source gpuvenv/bin/activate; \
-	pip install --upgrade pip; \
-	pip install -r requirements/gpu.txt; \
+	pip install -r requirements.txt; \
 	deactivate; \
 	)
 
