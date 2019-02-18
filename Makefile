@@ -1,4 +1,4 @@
-.PHONY: cpuvenv gpuvenv format 
+.PHONY: venv format 
 
 PYTHON = python3.5
 SHELL = bash
