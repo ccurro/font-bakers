@@ -8,23 +8,9 @@ Advisor: [Chris Curro](https://github.com/ccurro)
 
 ### Make virtual environment
 
-For CPU:
-
 ```bash
-make cpuvenv
-source cpuvenv/bin/activate
-.
-. # do your work
-.
-deactivate
-
-```
-
-For GPU:
-
-```bash
-make gpuvenv
-source gpuvenv/bin/activate
+make venv
+source venv/bin/activate
 .
 . # do your work
 .
@@ -34,5 +20,3 @@ deactivate
 ### Contributing
 
 Please format code before committing: `make format`
-
-
