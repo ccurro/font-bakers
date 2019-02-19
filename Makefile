@@ -1,7 +1,10 @@
-.PHONY: venv format 
+.PHONY: init venv format
 
 PYTHON = python3.5
 SHELL = bash
+
+init:
+	git config --global core.hooksPath .githooks
 
 venv:
 	( \
