@@ -14,5 +14,4 @@ venv:
 	)
 
 format:
-	yapf --in-place -r src/
-	yapf --in-place -r serialization/ -e serialization/font.proto -e serialization/font_pb2.py
+	yapf --in-place -r src/ -e src/serialization/font_pb2.py -e src/serialization/font.proto

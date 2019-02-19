@@ -1,24 +1,32 @@
 import torch
 from torch.utils import data
-import font_pb2
+from . import font_pb2
 from os.path import join
 import numpy as np
 import glob
 
 
 class Dataset(data.Dataset):
-    def __init__(self, proto_dir, dimensions):
+    def __init__(self, protos, dimensions):
         '''
         Parameters
         ----------
-        proto_dir : directory of where all the glyph protos are located
+        proto : string or list of strings
+            Either the path to the directory of where all the glyph protos are
+            located (string), or a list of protos
 
         dimensions: the dimensions desired for each of the glyphs given in
             (num_contours, num_bezier_curves, 3,2)
         '''
-        self.proto_dir = proto_dir
+        if isinstance(protos, str):
+            self.protobufs = glob.glob('{}/*'.format(protos))
+        elif isinstance(protos, list):
+            self.protobufs = protos
+        else:
+            raise ValueError(
+                '`protos` must be either a string or a list of strings.')
+
         self.dimensions = dimensions
-        self.protobufs = glob.glob('{}/*'.format(proto_dir))
 
     def __len__(self):
         return len(self.protobufs)
@@ -35,19 +43,22 @@ class Dataset(data.Dataset):
 
 def roll_pad_reshape(glyph_proto, dimensions):
     '''
-        Parameters
-        ----------
-        glyph_proto : the proto object containing all the glyphs for that shard
-        dimensions: the output dimensions we want to come out, The assumption is
-        that this follows (contours,curves,points=3,coordinates=2)
-        Returns:
-        -------
-        An numpy array with the dimensions specefied. Plus an additional
-        dimension of the number of examples in that shard. 
-        '''
+    Parameters
+    ----------
+    glyph_proto : the proto object containing all the glyphs for that shard
+    dimensions: the output dimensions we want to come out, The assumption is
+    that this follows (contours,curves,points=3,coordinates=2)
+
+    Returns:
+    -------
+    An numpy array with the dimensions specified. Plus an additional
+    dimension of the number of examples in that shard.
+    '''
     glyphs = glyph_proto.glyph
     dimensions = (len(glyphs), ) + dimensions
     reshaped_glyph = np.full(dimensions, 999.)
+    idx = np.random.randint(len(glyphs))
+
     for j, glyph_array in enumerate(glyphs):
         bezier_points = glyph_array.bezier_points
         contour_locations = glyph_array.contour_locations
@@ -65,4 +76,5 @@ def roll_pad_reshape(glyph_proto, dimensions):
             reshaped_glyph[j, i, :curves_dim, :, :] = folded_values[
                 0, 0, :curves_dim, :, :]
             start = end
-    return reshaped_glyph, glyph_array.glyph_name
+
+    return reshaped_glyph[idx, :, :, :, :], glyph_array.glyph_name
