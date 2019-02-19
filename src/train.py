@@ -20,11 +20,28 @@ DATA_PATH = '/zooper1/fontbakers/data/singleExampleProtos/'
 DIMENSIONS = (20, 30, 3, 2)
 TRAIN_TEST_SPLIT = 0.8
 
+CHARACTERS = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+    'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+    't', 'u', 'v', 'w', 'x', 'y', 'z', 'zero', 'one', 'two', 'three', 'four',
+    'five', 'six', 'seven', 'eight', 'nine', 'exclam', 'numbersign', 'dollar',
+    'percent', 'ampersand', 'asterisk', 'question', 'at'
+]
+CLASS_INDEX = {label: x for x, label in enumerate(CHARACTERS)}
 
-def validate(epoch_num):
+FONT_FILES = glob(DATA_PATH + '*')  # List of paths to protobuf files
+SPLIT = int(TRAIN_TEST_SPLIT * len(FONT_FILES))
+FONT_FILES_TRAIN = FONT_FILES[:SPLIT]
+FONT_FILES_VAL = FONT_FILES[SPLIT:]
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def validate(net, epoch_num):
     print('\tValidating...')
 
-    valset = Dataset(font_files_val, DIMENSIONS)
+    valset = Dataset(FONT_FILES_VAL, DIMENSIONS)
     valloader = data.DataLoader(
         valset, batch_size=16, shuffle=True, num_workers=4)
 
@@ -35,9 +52,9 @@ def validate(epoch_num):
 
     with torch.no_grad():
         for font, labels in valloader:
-            font = font.float().to(device)
-            labels = [class_index[label] for label in labels]
-            labels = torch.tensor(labels).to(device)
+            font = font.float().to(DEVICE)
+            labels = [CLASS_INDEX[label] for label in labels]
+            labels = torch.tensor(labels).to(DEVICE)
 
             outputs = net(font)
             _, predicted = torch.max(outputs.data, dim=1)
@@ -53,7 +70,7 @@ def validate(epoch_num):
     fig, ax = plt.subplots(figsize=[18, 12])
     plt.imshow(confusion)
     plt.colorbar()
-    classes = class_index.keys()
+    classes = CLASS_INDEX.keys()
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=45)
     plt.yticks(tick_marks, classes)
@@ -70,38 +87,20 @@ def validate(epoch_num):
 def main(argv):
     print('Starting...')
 
-    characters = [
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
-        'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b',
-        'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
-        'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'zero', 'one', 'two',
-        'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'exclam',
-        'numbersign', 'dollar', 'percent', 'ampersand', 'asterisk', 'question',
-        'at'
-    ]
-    class_index = {label: x for x, label in enumerate(characters)}
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    font_files = glob(DATA_PATH + '*')  # List of paths to protobuf files
-    split = int(TRAIN_TEST_SPLIT * len(font_files))
-    font_files_train = font_files[:split]
-    font_files_val = font_files[split:]
-
-    trainset = Dataset(font_files_train, DIMENSIONS)
+    trainset = Dataset(FONT_FILES_TRAIN, DIMENSIONS)
     trainloader = data.DataLoader(
         trainset, batch_size=16, shuffle=True, num_workers=4)
 
-    net = pantry.nets[FLAGS.pastry](device=device).to(device)
+    net = pantry.nets[FLAGS.pastry](device=DEVICE).to(DEVICE)
     optimizer, num_epochs = pantry.optims[FLAGS.pastry](net)
     criterion = nn.CrossEntropyLoss()
 
     for epoch in range(num_epochs):
         running_loss = 0.0
         for i, (font, labels) in enumerate(trainloader):
-            font = font.float().to(device)
-            labels = [class_index[label] for label in labels]
-            labels = torch.tensor(labels).to(device)
+            font = font.float().to(DEVICE)
+            labels = [CLASS_INDEX[label] for label in labels]
+            labels = torch.tensor(labels).to(DEVICE)
 
             # Zero the parameter gradients
             optimizer.zero_grad()
@@ -117,7 +116,7 @@ def main(argv):
             print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, loss_))
 
         # Validate at the end of every epoch.
-        validate(epoch)
+        validate(net, epoch)
 
     print('Finished.')
 
