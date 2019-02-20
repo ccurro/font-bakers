@@ -4,7 +4,8 @@ PYTHON = python3.5
 SHELL = bash
 
 init:
-	git config --global core.hooksPath .githooks
+	find .git/hooks -type l -exec rm {} \;
+	find .githooks -type f -exec ln -sf ../../{} .git/hooks/ \;
 
 venv:
 	( \
