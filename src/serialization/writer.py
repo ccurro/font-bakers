@@ -26,6 +26,32 @@ flags.DEFINE_integer("numexamples", 1,
                      "Approx number of glyphs in each protobuf file")
 
 
+def notRepeat(glyph, fontDict):
+    '''
+    This function will return False when a lowercase glyph is a copy of the
+    uppercase glyph from the same font.
+
+    Paramaters
+    ----------
+    glyph: the character we are trying to asses
+    fontDict: the dictionary that contains all the bezier information for a font
+
+    Returns
+    -------
+    Boolean
+        True if the glyph is not a repeat or is not a character we are checking
+        False if the glyph is a repeat of its corresponnding uppercase
+    '''
+
+    lowercase = set('abcdefghijklmnopqrstuvwxyz')
+    if glyph in lowercase and glyph.upper() in fontDict:
+        lowerContours = fontDict[glyph]
+        upperContours = fontDict[glyph.upper()]
+        if lowerContours == upperContours:
+            return False
+    return True
+
+
 def pkl2protos(protoDir, pickleName, fileNum):
     '''
     This function takes one pickle and proto directory and puts all of its glyphs
@@ -46,7 +72,7 @@ def pkl2protos(protoDir, pickleName, fileNum):
                 # we will keep track of the location of where each contour stops so we
                 # can reconstruct on the other end.
                 proto = font_pb2.glyph()
-                if glyph in CHARS:
+                if glyph in CHARS and notRepeat(glyph, fontDict):
                     contours = fontDict[glyph]
                     num_contours = len(contours)
                     points = []
@@ -81,6 +107,13 @@ def main(argv):
 
     #find all the pickles
     pickles = glob.glob('{}*.p'.format(pickleDir))
+    with open("/zooper1/fontbakers/font_caps_protos", 'r') as fo:
+        smallCaps = fo.read()
+        smallCaps = set(smallCaps.split("\n"))
+    print(len(smallCaps))
+    print(len(pickles))
+    pickles = [p for p in pickles if p.split('/')[-1] not in smallCaps]
+    print(len(pickles))
     # iterate through them and keep track of the example we are up to
     count = 0
     fileNum = 1
