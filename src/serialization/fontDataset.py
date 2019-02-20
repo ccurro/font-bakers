@@ -51,18 +51,16 @@ def roll_pad_reshape(glyph_proto, dimensions):
 
     Returns:
     -------
-    An numpy array with the dimensions specified. Plus an additional
-    dimension of the number of examples in that shard.
+    An numpy array with the dimensions specified.
     '''
     glyphs = glyph_proto.glyph
-    dimensions = (len(glyphs), ) + dimensions
     reshaped_glyph = np.full(dimensions, 999.)
 
     for j, glyph_array in enumerate(glyphs):
         bezier_points = glyph_array.bezier_points
         contour_locations = glyph_array.contour_locations
         start = 0
-        num_contours = min(len(contour_locations), dimensions[1])
+        num_contours = min(len(contour_locations), dimensions[0])
         for i in range(num_contours):
             contour = contour_locations[i]
             roll_num = np.random.randint(20)
@@ -70,10 +68,10 @@ def roll_pad_reshape(glyph_proto, dimensions):
             end = contour * 3 * 2 + start  # conversion from curves to points
             current_points = bezier_points[start:end]
             # fold it into the correct shape and pop it in.
-            folded_values = np.reshape(current_points, (1, 1, contour, 3, 2))
-            curves_dim = min(contour, dimensions[2])
-            reshaped_glyph[j, i, :curves_dim, :, :] = folded_values[
-                0, 0, :curves_dim, :, :]
+            folded_values = np.reshape(current_points, (1, contour, 3, 2))
+            curves_dim = min(contour, dimensions[1])
+            reshaped_glyph[i, :curves_dim, :, :] = folded_values[
+                0, :curves_dim, :, :]
             start = end
 
     return reshaped_glyph, glyph_array.glyph_name
