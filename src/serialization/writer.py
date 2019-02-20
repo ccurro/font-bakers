@@ -85,7 +85,7 @@ def main(argv):
     count = 0
     fileNum = 1
     for pickle in tqdm(pickles):
-        if count > numexamps:
+        if count >= numexamps:
             count = 0
             fileNum += 1
         pkl2protos(protoDir, pickle, fileNum)
