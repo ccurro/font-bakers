@@ -16,7 +16,7 @@ flags.DEFINE_string(
     "Pastry: indicates network, optimizer and number of epochs")
 flags.mark_flag_as_required("pastry")
 
-DATA_PATH = '/zooper1/fontbakers/data/singleExampleProtos/'
+DATA_PATH = '/zooper1/fontbakers/data/actualSingleExampleProtos/'
 DIMENSIONS = (20, 30, 3, 2)
 TRAIN_TEST_SPLIT = 0.8
 

@@ -57,7 +57,6 @@ def roll_pad_reshape(glyph_proto, dimensions):
     glyphs = glyph_proto.glyph
     dimensions = (len(glyphs), ) + dimensions
     reshaped_glyph = np.full(dimensions, 999.)
-    idx = np.random.randint(len(glyphs))
 
     for j, glyph_array in enumerate(glyphs):
         bezier_points = glyph_array.bezier_points
@@ -77,4 +76,4 @@ def roll_pad_reshape(glyph_proto, dimensions):
                 0, 0, :curves_dim, :, :]
             start = end
 
-    return reshaped_glyph[idx, :, :, :, :], glyph_array.glyph_name
+    return reshaped_glyph, glyph_array.glyph_name
