@@ -16,9 +16,11 @@ flags.DEFINE_string(
     "Pastry: indicates network, optimizer and number of epochs")
 flags.mark_flag_as_required("pastry")
 
-DATA_PATH = '/zooper1/fontbakers/data/actualSingleExampleProtos/'
+TRAIN_PATH_1 = '/zooper1/fontbakers/data/noCapsnoRepeatsT1/'
+TRAIN_PATH_2 = '/zooper1/fontbakers/data/noCapsnoRepeatsT2/'
+VAL_PATH = '/zooper1/fontbakers/data/noCapsnoRepeatsVal/'
+
 DIMENSIONS = (20, 30, 3, 2)
-TRAIN_TEST_SPLIT = 0.8
 
 CHARACTERS = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
@@ -30,12 +32,12 @@ CHARACTERS = [
 ]
 CLASS_INDEX = {label: x for x, label in enumerate(CHARACTERS)}
 
-FONT_FILES = glob(DATA_PATH + '*')  # List of paths to protobuf files
-SPLIT = int(TRAIN_TEST_SPLIT * len(FONT_FILES))
-FONT_FILES_TRAIN = FONT_FILES[:SPLIT]
-FONT_FILES_VAL = FONT_FILES[SPLIT:]
+# List of paths to protobuf files
+FONT_FILES_TRAIN_1 = glob(TRAIN_PATH_1 + '*')
+FONT_FILES_TRAIN_2 = glob(TRAIN_PATH_2 + '*')
+FONT_FILES_VAL = glob(VAL_PATH + '*')
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 
 def validate(net, epoch_num):
@@ -86,33 +88,37 @@ def validate(net, epoch_num):
 def main(argv):
     print('Starting...')
 
-    trainset = Dataset(FONT_FILES_TRAIN, DIMENSIONS)
-    trainloader = data.DataLoader(
-        trainset, batch_size=16, shuffle=True, num_workers=4)
-
     net = pantry.nets[FLAGS.pastry](device=DEVICE).to(DEVICE)
     optimizer, num_epochs = pantry.optims[FLAGS.pastry](net)
     criterion = nn.CrossEntropyLoss()
 
     for epoch in range(num_epochs):
-        running_loss = 0.0
-        for i, (font, labels) in enumerate(trainloader):
-            font = font.float().to(DEVICE)
-            labels = [CLASS_INDEX[label] for label in labels]
-            labels = torch.tensor(labels).to(DEVICE)
+        for path in [TRAIN_PATH_1, TRAIN_PATH_2]:
+            trainset = Dataset(path, DIMENSIONS)
+            trainloader = data.DataLoader(
+                trainset, batch_size=16, shuffle=True, num_workers=4)
 
-            # Zero the parameter gradients
-            optimizer.zero_grad()
+            running_loss = 0.0
 
-            # Forward, backward, optimize
-            prediction = net(font)
-            loss = criterion(prediction, labels)
-            loss.backward()
-            optimizer.step()
+            for i, (font, labels) in enumerate(trainloader):
+                font = font.float().to(DEVICE)
+                labels = [CLASS_INDEX[label] for label in labels]
+                labels = torch.tensor(labels).to(DEVICE)
 
-            # Print statistics
-            loss_ = loss.item()
-            print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, loss_))
+                # Zero the parameter gradients
+                optimizer.zero_grad()
+
+                # Forward, backward, optimize
+                prediction = net(font)
+                loss = criterion(prediction, labels)
+                loss.backward()
+                optimizer.step()
+
+                # Print statistics
+                loss_ = loss.item()
+                print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, loss_))
+
+            print('\tFinished with shard.')
 
         # Validate at the end of every epoch.
         validate(net, epoch)
