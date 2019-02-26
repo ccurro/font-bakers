@@ -35,7 +35,7 @@ SPLIT = int(TRAIN_TEST_SPLIT * len(FONT_FILES))
 FONT_FILES_TRAIN = FONT_FILES[:SPLIT]
 FONT_FILES_VAL = FONT_FILES[SPLIT:]
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 
 def validate(net, epoch_num):
@@ -43,7 +43,7 @@ def validate(net, epoch_num):
 
     valset = Dataset(FONT_FILES_VAL, DIMENSIONS)
     valloader = data.DataLoader(
-        valset, batch_size=16, shuffle=True, num_workers=4)
+        valset, batch_size=16, shuffle=True, num_workers=4, pin_memory=True)
 
     correct = 0
     total = 0
@@ -88,7 +88,7 @@ def main(argv):
 
     trainset = Dataset(FONT_FILES_TRAIN, DIMENSIONS)
     trainloader = data.DataLoader(
-        trainset, batch_size=16, shuffle=True, num_workers=4)
+        trainset, batch_size=16, shuffle=True, num_workers=4, pin_memory=True)
 
     net = pantry.nets[FLAGS.pastry](device=DEVICE).to(DEVICE)
     optimizer, num_epochs = pantry.optims[FLAGS.pastry](net)
@@ -113,6 +113,7 @@ def main(argv):
             # Print statistics
             loss_ = loss.item()
             print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, loss_))
+            del loss
 
         # Validate at the end of every epoch.
         validate(net, epoch)

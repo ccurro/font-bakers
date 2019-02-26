@@ -67,6 +67,8 @@ class Eggtart(nn.Module):
         return raster
 
     def forward(self, x):
+        # x.shape = [batch_size, 20, 30, 3, 2]
+        # `forward` must return shape [batch_size, 70]
         x = x.squeeze()
         batch_size = x.shape[0]
         x = x.view(batch_size, -1, 2)
@@ -78,4 +80,4 @@ class Eggtart(nn.Module):
 
 def eggtart_optimizer(net):
     '''Returns optimizer and number of epochs, in that order.'''
-    return optim.SGD(net.parameters(), lr=0.01, momentum=0.9), 10
+    return optim.SGD(net.parameters(), lr=0.01, momentum=0.9), 3
