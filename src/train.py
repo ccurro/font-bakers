@@ -48,7 +48,7 @@ def validate(net, epoch_num):
 
     valset = Dataset(FONT_FILES_VAL, DIMENSIONS)
     valloader = data.DataLoader(
-        valset, batch_size=FLAGS.batch, shuffle=True, num_workers=4)
+        valset, batch_size=FLAGS.batch, shuffle=True, num_workers=4, pin_memory=True)
 
     correct = 0
     total = 0
@@ -173,6 +173,8 @@ def main(argv):
             print(
                 '[%d, %5d] loss Generator: %.3f' % (epoch + 1, i + 1, lossg_))
 
+            del lossd_
+            del lossg_
 
         # Validate at the end of every epoch.
         validate(net, epoch)
