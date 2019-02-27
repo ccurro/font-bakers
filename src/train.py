@@ -13,13 +13,13 @@ from fridge import model_saver as saver
 np.set_printoptions(threshold=np.inf)  # Print full confusion matrix.
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string(
-    "pastry", None,
-    "Pastry: indicates discriminator network, optimizer and number of epochs")
-flags.mark_flag_as_required("pastry")
-flags.DEFINE_string("bread", None, "Bread: indicates generator and optimizer")
-flags.mark_flag_as_required("bread")
+flags.DEFINE_string("disc", None, "Pastry name of discriminator and optimizer")
+flags.mark_flag_as_required("disc")
+flags.DEFINE_string("gen", None, "Pastry name of generator and optimizer")
+flags.mark_flag_as_required("gen")
+flags.DEFINE_integer("styledim", 100, "Dimension of the latent style space")
 flags.DEFINE_integer("batch", 16, "Batch: indicates batch size")
+flags.DEFINE_integer("epochs", 2, "Number of epochs to train for")
 
 DATA_PATH = '/flour/noCapsnoRepeatsSingleExampleProtos/'
 DIMENSIONS = (20, 30, 3, 2)
@@ -48,7 +48,11 @@ def validate(net, epoch_num):
 
     valset = Dataset(FONT_FILES_VAL, DIMENSIONS)
     valloader = data.DataLoader(
-        valset, batch_size=FLAGS.batch, shuffle=True, num_workers=4, pin_memory=True)
+        valset,
+        batch_size=FLAGS.batch,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True)
 
     correct = 0
     total = 0
@@ -88,36 +92,22 @@ def validate(net, epoch_num):
     print('\n\n\n')
 
 
-'''
-Function to generate random character vector of size [batch size, 1]
-
-Parameters
-----------
-batch: number of characters in each batch
-
-Notes
------
-This function returns a vector where the number corresponds to a character. 70 responds to a 'fake' character
-'''
-
-
-def char_vector(batch, device):
-    char = torch.randint(0, 69, (1, batch), dtype=torch.float32)
-    return char.to(device)
-
-
 def main(argv):
     print('Starting...')
 
     trainset = Dataset(FONT_FILES_TRAIN, DIMENSIONS)
     trainloader = data.DataLoader(
-        trainset, batch_size=FLAGS.batch, shuffle=True, num_workers=4, pin_memory=True)
+        trainset,
+        batch_size=FLAGS.batch,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True)
 
-    disc = pantry.disc[FLAGS.pastry](DEVICE).to(DEVICE)
-    gen = pantry.gen[FLAGS.bread](DEVICE, (16, 20, 30, 3, 2)).to(DEVICE)
-    gen = gen.cuda()
-    optimizer_disc, num_epochs = pantry.optimsDisc[FLAGS.pastry](disc)
-    optimizer_gen = pantry.optimsGen[FLAGS.bread](gen)
+    disc = pantry.disc[FLAGS.disc](DEVICE).to(DEVICE)
+    gen = pantry.gen[FLAGS.gen](DEVICE, (16, 20, 30, 3, 2)).to(DEVICE)
+    optimizer_disc = pantry.optimsDisc[FLAGS.disc](disc)
+    optimizer_gen = pantry.optimsGen[FLAGS.gen](gen)
+    num_epochs = FLAGS.epochs
 
     criterion_disc = nn.CrossEntropyLoss()
     criterion_disc = nn.BCEWithLogitsLoss()
@@ -129,8 +119,11 @@ def main(argv):
             labels = [CLASS_INDEX[label] for label in labels]
             labels = torch.tensor(labels).to(DEVICE)
 
-            style_vec = torch.rand((FLAGS.batch, 100), device=DEVICE)
-            char_vec = char_vector(FLAGS.batch, DEVICE)
+            style_vec = torch.rand((FLAGS.batch, FLAGS.styledim),
+                                   device=DEVICE)
+            char_vec = torch.randint(
+                0, len(CHARACTERS) - 1, [1, FLAGS.batch],
+                dtype=torch.float32).to(DEVICE)
 
             # add index for fake character
             fake_vec = (len(CHARACTERS) + 1) * torch.ones(FLAGS.batch,

@@ -80,4 +80,4 @@ class Eggtart(nn.Module):
 
 def eggtart_optimizer(net):
     '''Returns optimizer and number of epochs, in that order.'''
-    return optim.SGD(net.parameters(), lr=0.01, momentum=0.9), 3
+    return optim.SGD(net.parameters(), lr=0.01, momentum=0.9)
