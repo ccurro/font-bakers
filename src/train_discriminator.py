@@ -8,18 +8,13 @@ from serialization.fontDataset import Dataset
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import pantry
-from fridge import model_saver as saver
 
 np.set_printoptions(threshold=np.inf)  # Print full confusion matrix.
 FLAGS = flags.FLAGS
-
 flags.DEFINE_string(
     "pastry", None,
-    "Pastry: indicates discriminator network, optimizer and number of epochs")
+    "Pastry: indicates network, optimizer and number of epochs")
 flags.mark_flag_as_required("pastry")
-flags.DEFINE_string("bread", None, "Bread: indicates generator and optimizer")
-flags.mark_flag_as_required("bread")
-flags.DEFINE_integer("batch", 16, "Batch: indicates batch size")
 
 DATA_PATH = '/flour/noCapsnoRepeatsSingleExampleProtos/'
 DIMENSIONS = (20, 30, 3, 2)
@@ -40,7 +35,7 @@ SPLIT = int(TRAIN_TEST_SPLIT * len(FONT_FILES))
 FONT_FILES_TRAIN = FONT_FILES[:SPLIT]
 FONT_FILES_VAL = FONT_FILES[SPLIT:]
 
-DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def validate(net, epoch_num):
@@ -48,7 +43,7 @@ def validate(net, epoch_num):
 
     valset = Dataset(FONT_FILES_VAL, DIMENSIONS)
     valloader = data.DataLoader(
-        valset, batch_size=FLAGS.batch, shuffle=True, num_workers=4)
+        valset, batch_size=16, shuffle=True, num_workers=4)
 
     correct = 0
     total = 0
@@ -88,39 +83,16 @@ def validate(net, epoch_num):
     print('\n\n\n')
 
 
-'''
-Function to generate random character vector of size [batch size, 1]
-
-Parameters
-----------
-batch: number of characters in each batch
-
-Notes
------
-This function returns a vector where the number corresponds to a character. 70 responds to a 'fake' character
-'''
-
-
-def char_vector(batch, device):
-    char = torch.randint(0, 69, (1, batch), dtype=torch.float32)
-    return char.to(device)
-
-
 def main(argv):
     print('Starting...')
 
     trainset = Dataset(FONT_FILES_TRAIN, DIMENSIONS)
     trainloader = data.DataLoader(
-        trainset, batch_size=FLAGS.batch, shuffle=True, num_workers=4, pin_memory=True)
+        trainset, batch_size=16, shuffle=True, num_workers=4)
 
-    disc = pantry.disc[FLAGS.pastry](DEVICE).to(DEVICE)
-    gen = pantry.gen[FLAGS.bread](DEVICE, (16, 20, 30, 3, 2)).to(DEVICE)
-    gen = gen.cuda()
-    optimizer_disc, num_epochs = pantry.optimsDisc[FLAGS.pastry](disc)
-    optimizer_gen = pantry.optimsGen[FLAGS.bread](gen)
-
-    criterion_disc = nn.CrossEntropyLoss()
-    criterion_disc = nn.BCEWithLogitsLoss()
+    net = pantry.nets[FLAGS.pastry](device=DEVICE).to(DEVICE)
+    optimizer, num_epochs = pantry.optims[FLAGS.pastry](net)
+    criterion = nn.CrossEntropyLoss()
 
     for epoch in range(num_epochs):
         running_loss = 0.0
@@ -129,50 +101,18 @@ def main(argv):
             labels = [CLASS_INDEX[label] for label in labels]
             labels = torch.tensor(labels).to(DEVICE)
 
-            style_vec = torch.rand((FLAGS.batch, 100), device=DEVICE)
-            char_vec = char_vector(FLAGS.batch, DEVICE)
+            # Zero the parameter gradients
+            optimizer.zero_grad()
 
-            # add index for fake character
-            fake_vec = (len(CHARACTERS) + 1) * torch.ones(FLAGS.batch,
-                                                          1).to(DEVICE)
-
-            # Combine char vector from real and fake charcters
-            labels_combined = torch.cat(
-                [labels.float(), fake_vec.squeeze().float()], 0)
-
-            # Generate characters
-            chars_generated = gen(char_vec, style_vec)
-
-            # Zero the parameter gradients for the discriminator
-            optimizer_disc.zero_grad()
-
-            # Make predictions
-            prediction_real = disc(font)
-            prediction_fake = disc(chars_generated)
-            prediction_combined = torch.cat((prediction_real, prediction_fake),
-                                            dim=0)
-
-            # Train the discriminator
-            loss_disc = criterion_disc(prediction_combined, labels_combined)
-            loss_disc.backward()
-            optimizer_disc.step()
-
-            # Zero the parameter gradients for the generator
-            optimizer_gen.zero_grad()
-
-            # Train the generator
-            loss_gen = criterion_disc(prediction_fake, char_vec)
-            loss_gen.backward()
-            optimizer_gen.step()
+            # Forward, backward, optimize
+            prediction = net(font)
+            loss = criterion(prediction, labels)
+            loss.backward()
+            optimizer.step()
 
             # Print statistics
-            lossd_ = loss_disc.item()
-            print('[%d, %5d] loss Discriminator: %.3f' % (epoch + 1, i + 1,
-                                                          lossd_))
-            lossg_ = loss_gen.item()
-            print(
-                '[%d, %5d] loss Generator: %.3f' % (epoch + 1, i + 1, lossg_))
-
+            loss_ = loss.item()
+            print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, loss_))
 
         # Validate at the end of every epoch.
         validate(net, epoch)
