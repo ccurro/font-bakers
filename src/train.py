@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils import data
+from torch import autograd
 from serialization.fontDataset import Dataset
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
@@ -24,6 +25,7 @@ flags.DEFINE_integer("epochs", 2, "Number of epochs to train for")
 DATA_PATH = '/flour/noCapsnoRepeatsSingleExampleProtos/'
 DIMENSIONS = (20, 30, 3, 2)
 TRAIN_TEST_SPLIT = 0.8
+LAMBDA_GP = 10
 
 CHARACTERS = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
@@ -41,6 +43,53 @@ FONT_FILES_TRAIN = FONT_FILES[:SPLIT]
 FONT_FILES_VAL = FONT_FILES[SPLIT:]
 
 DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+
+
+def compute_gradient_penalty(discriminator, real_samples, fake_samples):
+    """
+    Calculates the gradient penalty loss for WGAN-GP.
+
+    Parameters
+    ----------
+    discriminator : torch.nn.Module
+        Discriminator PyTorch module.
+
+    real_samples : [N, _, _, _, _]
+        True data. Zeroth dimension must be the batch dimension.
+
+    fake_samples : [N, _, _, _, _]
+        Generated samples. Zeroth dimension must be the batch dimension.
+
+    Returns
+    -------
+    gradient_penalty : float
+        Gradient penalty to enforce 1-Lipschitz condition.
+    """
+
+    # Random weight term for interpolation between real and fake samples
+    alpha = torch.randint(2, [real_samples.size(0), 1, 1, 1, 1])
+
+    # Get random interpolation between real and fake samples
+    interpolations = (
+        alpha * real_samples + (1 - alpha) * fake_samples).requires_grad_(True)
+
+    d_interpolates = discriminator(interpolates)
+    fake = autograd.Variable(
+        torch.ones([real_samples.shape[0], 1]), requires_grad=False)
+
+    # Get gradient with respect to the interpolations.
+    gradients = autograd.grad(
+        outputs=d_interpolates,
+        inputs=interpolates,
+        grad_outputs=fake,
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True,
+    )[0]
+
+    gradients = gradients.view(gradients.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1)**2).mean()
+    return gradient_penalty
 
 
 def validate(net, epoch_num):
@@ -109,65 +158,70 @@ def main(argv):
     optimizer_gen = pantry.optimsGen[FLAGS.gen](gen)
     num_epochs = FLAGS.epochs
 
-    criterion_disc = nn.CrossEntropyLoss()
-    criterion_disc = nn.BCEWithLogitsLoss()
-
     for epoch in range(num_epochs):
-        running_loss = 0.0
-        for i, (font, labels) in enumerate(trainloader):
-            font = font.float().to(DEVICE)
-            labels = [CLASS_INDEX[label] for label in labels]
-            labels = torch.tensor(labels).to(DEVICE)
+        for i, (real_chars, _) in enumerate(trainloader):
+            # -------------------
+            # Train Discriminator
+            # -------------------
 
-            style_vec = torch.rand((FLAGS.batch, FLAGS.styledim),
-                                   device=DEVICE)
-            char_vec = torch.randint(
-                0, len(CHARACTERS) - 1, [1, FLAGS.batch],
-                dtype=torch.float32).to(DEVICE)
-
-            # add index for fake character
-            fake_vec = (len(CHARACTERS) + 1) * torch.ones(FLAGS.batch,
-                                                          1).to(DEVICE)
-
-            # Combine char vector from real and fake charcters
-            labels_combined = torch.cat(
-                [labels.float(), fake_vec.squeeze().float()], 0)
-
-            # Generate characters
-            chars_generated = gen(char_vec, style_vec)
-
-            # Zero the parameter gradients for the discriminator
+            # Zero the gradients for the generator
             optimizer_disc.zero_grad()
 
-            # Make predictions
-            prediction_real = disc(font)
-            prediction_fake = disc(chars_generated)
-            prediction_combined = torch.cat((prediction_real, prediction_fake),
-                                            dim=0)
+            # Create random dense style vector
+            style_vector = torch.rand([FLAGS.batch, FLAGS.styledim],
+                                      device=DEVICE)
 
-            # Train the discriminator
-            loss_disc = criterion_disc(prediction_combined, labels_combined)
+            # Create random one-hot character vector
+            char_vector = torch.zeros(
+                [FLAGS.batch, len(CHARACTERS)], device=DEVICE)
+            onehot = np.random.randint(
+                low=0, high=len(CHARACTERS), size=FLAGS.batch)
+            char_vector[range(FLAGS.batch), onehot] = 1
+
+            # Convert real characters and generate a batch of fake characters
+            real_chars = real_chars.float().to(DEVICE)
+            fake_chars = gen(char_vector, style_vector)
+
+            real_validity = disc(real_chars)  # Real characters
+            fake_validity = disc(fake_chars)  # Fake characters
+
+            # Gradient penalty
+            gradient_penalty = compute_gradient_penalty(
+                disc, real_chars, fake_chars)
+
+            # Discriminator loss
+            loss_disc = -torch.mean(real_validity) + torch.mean(
+                fake_validity) + LAMBDA_GP * gradient_penalty
+
             loss_disc.backward()
             optimizer_disc.step()
 
-            # Zero the parameter gradients for the generator
+            # Print statistics and delete loss
+            print('[%d, %5d] loss Discriminator: %.3f' % (epoch + 1, i + 1,
+                                                          loss_disc.item()))
+            del loss_disc
+
+            # ---------------
+            # Train Generator
+            # ---------------
+
+            # Zero the gradients for the generator
             optimizer_gen.zero_grad()
 
-            # Train the generator
-            loss_gen = criterion_disc(prediction_fake, char_vec)
+            # Generate a batch of fake characters
+            fake_chars = gen(char_vector, style_vector)
+
+            # Generator loss
+            fake_validity = disc(fake_chars)
+            loss_gen = -torch.mean(fake_validity)
+
             loss_gen.backward()
             optimizer_gen.step()
 
-            # Print statistics
-            lossd_ = loss_disc.item()
-            print('[%d, %5d] loss Discriminator: %.3f' % (epoch + 1, i + 1,
-                                                          lossd_))
-            lossg_ = loss_gen.item()
-            print(
-                '[%d, %5d] loss Generator: %.3f' % (epoch + 1, i + 1, lossg_))
-
-            del lossd_
-            del lossg_
+            # Print statistics and delete loss
+            print('[%d, %5d] loss Generator: %.3f' % (epoch + 1, i + 1,
+                                                      loss_gen.item()))
+            del loss_gen
 
         # Validate at the end of every epoch.
         validate(net, epoch)
