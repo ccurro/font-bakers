@@ -2,9 +2,8 @@ from absl import flags, app
 from glob import glob
 import numpy as np
 import torch
-from torch import nn
+from torch import nn, autograd
 from torch.utils import data
-from torch import autograd
 from serialization.fontDataset import Dataset
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
@@ -21,6 +20,7 @@ flags.mark_flag_as_required("gen")
 flags.DEFINE_integer("styledim", 100, "Dimension of the latent style space")
 flags.DEFINE_integer("batch", 16, "Batch: indicates batch size")
 flags.DEFINE_integer("epochs", 2, "Number of epochs to train for")
+flags.DEFINE_float("clip", 1.0, "Value to clip norm of gradients at")
 
 DATA_PATH = '/flour/noCapsnoRepeatsSingleExampleProtos/'
 DIMENSIONS = (20, 30, 3, 2)
@@ -67,15 +67,16 @@ def compute_gradient_penalty(discriminator, real_samples, fake_samples):
     """
 
     # Random weight term for interpolation between real and fake samples
-    alpha = torch.randint(2, [real_samples.size(0), 1, 1, 1, 1])
-
+    alpha = torch.randint(2, [real_samples.size(0), 1, 1, 1, 1]).type(
+        torch.cuda.FloatTensor).to(DEVICE)
     # Get random interpolation between real and fake samples
-    interpolations = (
+    interpolates = (
         alpha * real_samples + (1 - alpha) * fake_samples).requires_grad_(True)
 
     d_interpolates = discriminator(interpolates)
     fake = autograd.Variable(
-        torch.ones([real_samples.shape[0], 1]), requires_grad=False)
+        torch.ones([real_samples.shape[0], 70]),
+        requires_grad=False).type(torch.cuda.FloatTensor).to(DEVICE)
 
     # Get gradient with respect to the interpolations.
     gradients = autograd.grad(
@@ -153,7 +154,17 @@ def main(argv):
         pin_memory=True)
 
     disc = pantry.disc[FLAGS.disc](DEVICE).to(DEVICE)
-    gen = pantry.gen[FLAGS.gen](DEVICE, (16, 20, 30, 3, 2)).to(DEVICE)
+    gen = pantry.gen[FLAGS.gen](
+        DEVICE,
+        fcSize=512,
+        numFC=5,
+        styleDim=100,
+        outputDim=(16, 20, 30, 3, 2),
+        numBlocks=5,
+        startDim=(16, 30, 30, 3, 2),
+        channels=64,
+        kernel=(9, 3, 1),
+        numClasses=70).to(DEVICE)
     optimizer_disc = pantry.optimsDisc[FLAGS.disc](disc)
     optimizer_gen = pantry.optimsGen[FLAGS.gen](gen)
     num_epochs = FLAGS.epochs
@@ -193,7 +204,10 @@ def main(argv):
             loss_disc = -torch.mean(real_validity) + torch.mean(
                 fake_validity) + LAMBDA_GP * gradient_penalty
 
+            # Update discriminator with clipped gradients
             loss_disc.backward()
+            nn.utils.clip_grad_norm_(
+                disc.parameters(), FLAGS.clip, norm_type=2)
             optimizer_disc.step()
 
             # Print statistics and delete loss
@@ -215,7 +229,9 @@ def main(argv):
             fake_validity = disc(fake_chars)
             loss_gen = -torch.mean(fake_validity)
 
+            # Update generator with clipped gradients
             loss_gen.backward()
+            nn.utils.clip_grad_norm_(gen.parameters(), FLAGS.clip, norm_type=2)
             optimizer_gen.step()
 
             # Print statistics and delete loss

@@ -2,9 +2,9 @@ from eggtart import Eggtart, eggtart_optimizer
 # from challah import Challah, challah_optimizer
 # from sourdough import Sourdough, sourdough_optimizer
 # from bublik import Bublik, bublik_optimizer
-from rolls import Rolls, rolls_optimizer
+from matzah import Matzah, matzah_optimizer
 
-# discriminators
+# Discriminators
 disc = {
     'eggtart': Eggtart,
     # 'sourdough': Sourdough,
@@ -12,7 +12,7 @@ disc = {
     # 'bublik': Bublik,
 }
 
-# Optimizers
+# Discriminator optimizers
 optimsDisc = {
     'eggtart': eggtart_optimizer,
     # 'sourdough': sourdough_optimizer,
@@ -20,11 +20,12 @@ optimsDisc = {
     # 'bublik': bublik_optimizer,
 }
 
-# generators
+# Generators
 gen = {
-    'rolls': Rolls,
+    'matzah': Matzah,
 }
 
+# Generator optimizers
 optimsGen = {
-    'rolls': rolls_optimizer,
+    'matzah': matzah_optimizer,
 }
