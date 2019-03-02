@@ -3,7 +3,6 @@
 from absl import app, flags
 from time import time
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 
 FLAGS = flags.FLAGS
@@ -31,13 +30,13 @@ def _sample_quadratic_bezier(control_points, steps):
 
     Returns
     -------
-    samples : [2, num_steps]
+    samples : [num_samples, 2]
     '''
     P0 = control_points[0].unsqueeze(1)
     P1 = control_points[1].unsqueeze(1)
     P2 = control_points[2].unsqueeze(1)
     samples = (P1 + (1 - steps)**2 * (P0 - P1) + steps**2 * (P2 - P1))
-    return samples
+    return torch.t(samples)
 
 
 def _sample_quadratic_bezier_derivative(control_points, steps):
@@ -53,13 +52,13 @@ def _sample_quadratic_bezier_derivative(control_points, steps):
 
     Returns
     -------
-    derivative : [2, num_steps]
+    derivative : [num_samples, 2]
     '''
     P0 = control_points[0].unsqueeze(1)
     P1 = control_points[1].unsqueeze(1)
     P2 = control_points[2].unsqueeze(1)
     derivative = 2 * steps * (P2 - P1) + 2 * (1 - steps) * (P1 - P0)
-    return derivative
+    return torch.t(derivative)
 
 
 def _sample_cubic_bezier(control_points, steps):
@@ -75,7 +74,7 @@ def _sample_cubic_bezier(control_points, steps):
 
     Returns
     -------
-    samples : [2, num_steps]
+    samples : [num_samples, 2]
     '''
     P0 = control_points[0].unsqueeze(1)
     P1 = control_points[1].unsqueeze(1)
@@ -83,7 +82,7 @@ def _sample_cubic_bezier(control_points, steps):
     P3 = control_points[3].unsqueeze(1)
     samples = ((1 - steps)**3 * P0 + 3 * steps * (1 - steps)**2 * P1 +
                3 * (1 - steps) * steps**2 * P2 + steps**3 * P2)
-    return samples
+    return torch.t(samples)
 
 
 def _sample_cubic_bezier_derivative(control_points, steps):
@@ -99,7 +98,7 @@ def _sample_cubic_bezier_derivative(control_points, steps):
 
     Returns
     -------
-    derivative : [2, num_steps]
+    derivative : [num_samples, 2]
     '''
     P0 = control_points[0].unsqueeze(1)
     P1 = control_points[1].unsqueeze(1)
@@ -107,7 +106,7 @@ def _sample_cubic_bezier_derivative(control_points, steps):
     P3 = control_points[3].unsqueeze(1)
     derivative = (3 * (1 - steps)**2 * (P1 - P0) + 6 * steps * (1 - steps) *
                   (P2 - P1) + 3 * steps**2 * (P3 - P2))
-    return derivative
+    return torch.t(derivative)
 
 
 def sample_bezier(control_points, steps):
@@ -123,7 +122,7 @@ def sample_bezier(control_points, steps):
 
     Returns
     -------
-    curve : [2, num_steps]
+    curve : [num_samples, 2]
     '''
     if control_points.size()[0] == 3:
         curve = _sample_quadratic_bezier(control_points, steps)
@@ -149,7 +148,7 @@ def sample_bezier_derivative(control_points, steps):
 
     Returns
     -------
-    curve : [2, num_steps]
+    curve : [num_samples, 2]
     '''
     if control_points.size()[0] == 3:
         curve = _sample_quadratic_bezier_derivative(control_points, steps)
@@ -163,12 +162,25 @@ def sample_bezier_derivative(control_points, steps):
 
 
 class Rasterizer(torch.nn.Module):
-    def __init__(self, resolution=256, steps=128, sigma=1e-2, method='base'):
+    def __init__(self,
+                 resolution=256,
+                 steps=128,
+                 sigma=1e-2,
+                 method='base',
+                 use_cuda=True):
         super(Rasterizer, self).__init__()
         self.resolution = resolution
         self.steps = torch.linspace(0, 1, steps)
         self.sigma = sigma
         self.method = method
+
+        if use_cuda and torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        elif use_cuda and not torch.cuda.is_available():
+            print('Rasterizer: CUDA not available. Falling back on CPU.')
+            self.device = torch.device('cpu')
+        else:
+            self.device = torch.device('cpu')
 
         # TODO the follow line is required for the `tiled` method
         # self.gpu = torch.empty(2)
@@ -192,8 +204,10 @@ class Rasterizer(torch.nn.Module):
         YY = np.flip(YY)
         XX_expanded = XX[:, :, np.newaxis]
         YY_expanded = YY[:, :, np.newaxis]
-        self.x_meshgrid = torch.Tensor(XX_expanded / self.resolution)
-        self.y_meshgrid = torch.Tensor(YY_expanded / self.resolution)
+        self.x_meshgrid = torch.Tensor(XX_expanded / self.resolution).to(
+            self.device)
+        self.y_meshgrid = torch.Tensor(YY_expanded / self.resolution).to(
+            self.device)
 
         if method == 'base':
             self.raster = self._raster_base
@@ -221,24 +235,30 @@ class Rasterizer(torch.nn.Module):
 
         Parameters
         ----------
-        control_points : [num_beziers, 3, 2] or [num_beziers, 4, 2]
-            1st dimension is the number of Bezier curves.
-            2nd dimension is the number of control points per Bezier curve (3 for quadratic, 4 for cubic).
-            3rd dimension is 2 for the x and y coordinates.
+        control_points : [batch_size, num_beziers, 3, 2] or [batch_size, num_beziers, 4, 2]
+            1st dimension is the batch size.
+            2nd dimension is the number of Bezier curves.
+            3rd dimension is the number of control points per Bezier curve (3 for quadratic, 4 for cubic).
+            4th dimension is 2 for the x and y coordinates.
 
         Returns
         -------
-        raster : [resolution, resolution]
-            Rastered glyph.
+        raster : [batch_size, resolution, resolution]
+            Rastered glyphs.
         '''
-        samples = torch.cat(
-            [sample_bezier(bezier, self.steps) for bezier in control_points],
-            dim=1)
-        derivative_samples = torch.cat([
-            sample_bezier_derivative(bezier, self.steps)
-            for bezier in control_points
-        ],
-                                       dim=1)
+        samples = torch.stack([
+            torch.cat(
+                [sample_bezier(bezier, self.steps) for bezier in character])
+            for character in control_points
+        ]).to(self.device)
+
+        derivative_samples = torch.stack([
+            torch.cat([
+                sample_bezier_derivative(bezier, self.steps)
+                for bezier in character
+            ]) for character in control_points
+        ]).to(self.device)
+
         return self.raster(samples, derivative_samples, self.sigma)
 
     def _raster_base(self, samples, derivative_samples, sigma):
@@ -247,10 +267,10 @@ class Rasterizer(torch.nn.Module):
 
         Parameters
         ----------
-        samples : [2, num_samples]
+        samples : [batch_size, num_samples, 2]
             Samples from the glyph's Bezier curves.
             Here, num_samples = num_beziers * num_steps.
-        derivative_samples : [2, num_samples]
+        derivative_samples : [batch_size, num_samples, 2]
             Samples from the glyph's Bezier curves' derivatives, i.e. the Bezier
             speed. Here, num_samples = num_beziers * num_steps.
         sigma : float
@@ -258,26 +278,26 @@ class Rasterizer(torch.nn.Module):
 
         Returns
         -------
-        raster : [resolution, resolution]
+        raster : [batch_size, resolution, resolution]
             Rastered glyph.
         '''
+        batch_size = samples.size()[0]
         num_samples = samples.size()[1]
-        x_samples = samples[0]
-        y_samples = samples[1]
+        x_samples = samples[:, :, 0].unsqueeze(1).unsqueeze(1)
+        y_samples = samples[:, :, 1].unsqueeze(1).unsqueeze(1)
 
         x_meshgrid_expanded = self.x_meshgrid.expand(
-            self.resolution, self.resolution, num_samples)
+            batch_size, self.resolution, self.resolution, num_samples)
         y_meshgrid_expanded = self.y_meshgrid.expand(
-            self.resolution, self.resolution, num_samples)
+            batch_size, self.resolution, self.resolution, num_samples)
 
         raster = torch.exp(
             (-(x_samples - x_meshgrid_expanded)**2 -
              (y_samples - y_meshgrid_expanded)**2) / (2 * sigma**2))
 
-        speeds = torch.norm(derivative_samples, dim=0)
-        raster = torch.matmul(raster, speeds)
-
-        return torch.squeeze(raster)
+        speeds = torch.norm(derivative_samples, dim=2)
+        raster = torch.einsum('ijkl,il->ijk', raster, speeds)
+        return raster
 
     def _raster_base_half(self, samples, derivative_samples, sigma):
         '''
@@ -287,40 +307,41 @@ class Rasterizer(torch.nn.Module):
 
         Parameters
         ----------
-        samples : [2, num_samples]
-            Where num_samples = num_steps x  num_bezier
-        derivative_samples : [2, num_samples]
+        samples : [batch_size, num_samples, 2]
+            Samples from the glyph's Bezier curves.
+            Here, num_samples = num_beziers * num_steps.
+        derivative_samples : [batch_size, num_samples, 2]
             Samples from the glyph's Bezier curves' derivatives, i.e. the Bezier
             speed. Here, num_samples = num_beziers * num_steps.
-        sigma: float
-            Standard deviation of the Gaussian normalized by raster resolution
+        sigma : float
+            Standard deviation of Gaussians, normalized by the raster resolution.
 
         Returns
         -------
-        raster : [resolution, resolution]
+        raster : [batch_size, resolution, resolution]
             Rastered glyph.
 
         Notes
         -----
         https://discuss.pytorch.org/t/pytorch1-0-halftensor-support/
         '''
+        batch_size = samples.size()[0]
         num_samples = samples.size()[1]
-        x_samples = samples[0].half()
-        y_samples = samples[1].half()
+        x_samples = samples[:, :, 0].unsqueeze(1).unsqueeze(1).half()
+        y_samples = samples[:, :, 1].unsqueeze(1).unsqueeze(1).half()
 
         x_meshgrid_expanded = self.x_meshgrid.expand(
-            self.resolution, self.resolution, num_samples).half()
+            batch_size, self.resolution, self.resolution, num_samples).half()
         y_meshgrid_expanded = self.y_meshgrid.expand(
-            self.resolution, self.resolution, num_samples).half()
+            batch_size, self.resolution, self.resolution, num_samples).half()
 
         raster = torch.exp(
             (-(x_samples - x_meshgrid_expanded)**2 -
              (y_samples - y_meshgrid_expanded)**2) / (2 * sigma**2))
 
-        speeds = torch.norm(derivative_samples, dim=0).half()
-        raster = torch.matmul(raster, speeds)
-
-        return torch.squeeze(raster.float())
+        speeds = torch.norm(derivative_samples, dim=2).half()
+        raster = torch.einsum('ijkl,il->ijk', raster, speeds)
+        return raster.float()
 
     """
     def _raster_shrunk(self, samples, sigma):
@@ -498,25 +519,26 @@ class Rasterizer(torch.nn.Module):
 
 
 def main(argv):
-    use_cuda = torch.cuda.is_available() and not FLAGS.disable_cuda
+    use_cuda = torch.cuda.is_available() and not FLAGS.disablecuda
     device = torch.device("cuda" if use_cuda else "cpu")
     print('Using device "{}"'.format(device))
 
     # Set toy control points for testing
     if FLAGS.draw == 'quadratic':
-        # Shape: [1, 3, 2]
-        control_points_ = np.array([[[0.1, 0.1], [0.9, 0.9], [0.5, 0.9]]])
+        # Shape: [2, 1, 3, 2]
+        control_points_ = np.array([[[[0.1, 0.1], [0.9, 0.9], [0.5, 0.9]]],
+                                    [[[0.1, 0.1], [0.9, 0.9], [0.5, 0.9]]]])
     elif FLAGS.draw == 'cubic':
-        # Shape: [1, 4, 2]
-        control_points_ = np.array([[[1.0, 0.0], [0.21, 0.12], [0.72, 0.83],
-                                     [0.0, 1.0]]])
+        # Shape: [1, 1, 4, 2]
+        control_points_ = np.array([[[[1.0, 0.0], [0.21, 0.12], [0.72, 0.83],
+                                      [0.0, 1.0]]]])
     elif FLAGS.draw == 'char':
-        # Shape: [3, 3, 2]
-        control_points_ = np.array([
+        # Shape: [1, 3, 3, 2]
+        control_points_ = np.array([[
             [[0.1, 0.1], [0.9, 0.9], [0.5, 0.9]],
             [[0.5, 0.9], [0.1, 0.9], [0.3, 0.3]],
             [[0.3, 0.3], [0.9, 0.9], [0.9, 0.1]],
-        ])
+        ]])
     else:
         raise ValueError(
             "`draw` flag must be one of 'quadratic', 'cubic' or 'char'.")
