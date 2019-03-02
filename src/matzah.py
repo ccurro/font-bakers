@@ -132,4 +132,4 @@ class Matzah(nn.Module):
 
 def matzah_optimizer(net):
     '''Returns optimizer and number of epochs, in that order.'''
-    return optim.Adam(net.parameters(), lr=0.00001)
+    return optim.Adam(net.parameters(), lr=0.002)

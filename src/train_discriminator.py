@@ -8,6 +8,7 @@ from serialization.fontDataset import Dataset
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import pantry
+from utils import CHARACTERS
 
 np.set_printoptions(threshold=np.inf)  # Print full confusion matrix.
 FLAGS = flags.FLAGS
@@ -20,16 +21,7 @@ DATA_PATH = '/flour/noCapsnoRepeatsSingleExampleProtos/'
 DIMENSIONS = (20, 30, 3, 2)
 TRAIN_TEST_SPLIT = 0.8
 
-CHARACTERS = [
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
-    'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
-    't', 'u', 'v', 'w', 'x', 'y', 'z', 'zero', 'one', 'two', 'three', 'four',
-    'five', 'six', 'seven', 'eight', 'nine', 'exclam', 'numbersign', 'dollar',
-    'percent', 'ampersand', 'asterisk', 'question', 'at'
-]
 CLASS_INDEX = {label: x for x, label in enumerate(CHARACTERS)}
-
 FONT_FILES = glob(DATA_PATH + '*')  # List of paths to protobuf files
 SPLIT = int(TRAIN_TEST_SPLIT * len(FONT_FILES))
 FONT_FILES_TRAIN = FONT_FILES[:SPLIT]
