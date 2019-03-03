@@ -15,6 +15,7 @@ flags.DEFINE_integer('resolution', 64,
 flags.DEFINE_string('device', 'cuda:0', "Device to train and infer on.")
 
 
+@torch.no_grad()
 def infer(gen, num_fonts, path, style_dim=100, resolution=64, device='cuda'):
     """
     Runs generator at inference time to generate a batch of fonts.

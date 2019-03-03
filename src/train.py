@@ -187,6 +187,7 @@ def main(argv):
                     FLAGS.gen,
                     FLAGS.disc,
                     path='../output/checkpoints/')
+                gen.eval()
                 infer(
                     gen,
                     num_fonts=FLAGS.numfonts,
@@ -194,6 +195,7 @@ def main(argv):
                     style_dim=FLAGS.styledim,
                     resolution=FLAGS.resolution,
                     device=FLAGS.device)
+                gen.train()
 
     print('Finished.')
 
