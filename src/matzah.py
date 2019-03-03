@@ -63,8 +63,8 @@ class StyleNetwork(nn.Module):
 
 
 class SynthesisNetwork(nn.Module):
-    def __init__(self, DEVICE, outputDim, styleDim, numBlocks,
-                 channels, kernel):
+    def __init__(self, DEVICE, outputDim, styleDim, numBlocks, channels,
+                 kernel):
         super(SynthesisNetwork, self).__init__()
         self.numBlocks = numBlocks
         self.outputDim = outputDim
@@ -101,30 +101,33 @@ class SynthesisNetwork(nn.Module):
         return generatedCurves
 
     def forward(self, batchSize, latentStyle):
-        outDim = [batchSize]  + list(self.outputDim)
+        outDim = [batchSize] + list(self.outputDim)
         generatedCurves = torch.zeros(outDim).to(self.DEVICE)
         # got to do first convolution to get it up to the right channel size
         generatedCurves = self.conv1(generatedCurves)
         for i in range(self.numBlocks):
-            generatedCurves = self.synthesisBlock(outDim,generatedCurves, latentStyle,
-                                                  i)
+            generatedCurves = self.synthesisBlock(outDim, generatedCurves,
+                                                  latentStyle, i)
         generatedCurves = self.conv2(generatedCurves)
         return generatedCurves
 
 
 class Matzah(nn.Module):
     def __init__(self, DEVICE, fcSize, numFC, styleDim, outputDim, numBlocks,
-                  channels, kernel, numClasses):
+                 channels, kernel, numClasses):
         super(Matzah, self).__init__()
         self.Style = StyleNetwork(DEVICE, fcSize, numFC, styleDim)
         self.Synthesis = SynthesisNetwork(DEVICE, outputDim,
                                           fcSize + numClasses, numBlocks,
-                                           channels, kernel)
+                                          channels, kernel)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, styleVec, classVec):
         latentStyle = self.Style.forward(styleVec, classVec)
         # now need to set up the other side of the network.
-        generatedCurves = self.Synthesis.forward(styleVec.shape[0], latentStyle)
+        generatedCurves = self.Synthesis.forward(styleVec.shape[0],
+                                                 latentStyle)
+        geneartedCurves = 6 * self.sigmoid(generatedCurves) - 3
         return generatedCurves
 
 
