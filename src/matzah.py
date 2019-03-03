@@ -70,6 +70,7 @@ class SynthesisNetwork(nn.Module):
         self.outputDim = outputDim
         self.flatOutputDim = np.prod(outputDim)
         self.DEVICE = DEVICE
+        self.channels = channels
         self.noiseScales = [
             torch.randn(1, requires_grad=True).to(DEVICE)
             for _ in range(numBlocks)
@@ -77,11 +78,6 @@ class SynthesisNetwork(nn.Module):
         self.affineTransforms = [
             nn.Linear(styleDim, 2 * channels).to(DEVICE)
             for _ in range(numBlocks)
-        ]
-        noiseDim = list(outputDim)
-        noiseDim[1] = channels
-        self.noises = [
-            torch.randn(noiseDim).to(DEVICE) for _ in range(numBlocks)
         ]
         self.adain = adain
         # go to figure out the padding here....
@@ -96,8 +92,10 @@ class SynthesisNetwork(nn.Module):
             channels, outputDim[1], kernel, padding=[4, 1, 0]).to(DEVICE)
 
     def synthesisBlock(self, generatedCurves, latentStyle, index):
+        noiseDim = list(self.outputDim)
+        noiseDim[1] = self.channels
         generatedCurves = generatedCurves \
-            + self.noises[index]*self.noiseScales[index]
+            + torch.randn(noiseDim).to(self.DEVICE)*self.noiseScales[index]
         affineStyle = self.affineTransforms[index](latentStyle)
         self.adain(generatedCurves, affineStyle)
         generatedCurves = self.relu(self.convolutions[index](generatedCurves))
