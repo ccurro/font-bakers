@@ -94,9 +94,9 @@ def main(argv):
                          fcSize=128,
                          numFC=3,
                          styleDim=100,
-                         outputDim=(16, 20, 30, 3, 2),
+                         outputDim=(FLAGS.batch, 20, 30, 3, 2),
                          numBlocks=3,
-                         startDim=(16, 30, 30, 3, 2),
+                         startDim=(FLAGS.batch, 30, 30, 3, 2),
                          channels=32,
                          kernel=(9, 3, 1),
                          numClasses=70).to(FLAGS.device)
