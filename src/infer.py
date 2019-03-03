@@ -34,23 +34,27 @@ def infer(gen, num_fonts, path, style_dim=100, resolution=64, device='cuda'):
 
     Returns
     -------
+    Saves fonts to specified path.
     """
-    # Create random dense style vector
-    # style_vector = torch.rand([num_fonts * len(CHARACTERS), style_dim], device=FLAGS.device)
-    style_vector = torch.rand([16, style_dim], device=FLAGS.device)
+    raster_list = []
 
-    # Create random one-hot character vector
-    # char_vector = torch.eye(len(CHARACTERS), device=FLAGS.device).repeat([num_fonts, 1])
-    char_vector = torch.zeros([16, len(CHARACTERS)], device=FLAGS.device)
-    char_vector[range(16), range(16)] = 1
+    for i in range(num_fonts):
+        # Create random dense style vector
+        style_vector = torch.rand([len(CHARACTERS), style_dim],
+                                  device=FLAGS.device)
 
-    # Generate a batch of fake characters
-    fake_chars = gen(char_vector, style_vector)
-    fake_chars = torch.reshape(fake_chars, [num_fonts, -1, 2])
-    rasters = rasterize(fake_chars)
+        # Create random one-hot character vector
+        char_vector = torch.eye(len(CHARACTERS), device=FLAGS.device)
 
-    # save_images(rasters, [num_fonts, len(CHARACTERS)], path + '_raster.png')
-    save_images(rasters, [4, 4], path + '_raster.png')
+        # Generate a batch of fake characters
+        fake_chars = gen(char_vector, style_vector)
+        fake_chars = torch.reshape(fake_chars, [1, -1, 2]).detach()
+        rasters = rasterize(fake_chars).detach()
+        raster_list.append(rasters)
+
+    raster_list = torch.cat(raster_list)
+    save_images(raster_list, [num_fonts, len(CHARACTERS)],
+                path + '_raster.png')
     torch.save(fake_chars, path + '_bezier.pt')
 
 

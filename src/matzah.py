@@ -63,7 +63,7 @@ class StyleNetwork(nn.Module):
 
 
 class SynthesisNetwork(nn.Module):
-    def __init__(self, DEVICE, outputDim, styleDim, numBlocks, startDim,
+    def __init__(self, DEVICE, outputDim, styleDim, numBlocks,
                  channels, kernel):
         super(SynthesisNetwork, self).__init__()
         self.numBlocks = numBlocks
@@ -86,13 +86,12 @@ class SynthesisNetwork(nn.Module):
             for _ in range(numBlocks)
         ]
         self.conv1 = nn.Conv3d(
-            outputDim[1], channels, kernel, padding=[4, 1, 0]).to(DEVICE)
+            outputDim[0], channels, kernel, padding=[4, 1, 0]).to(DEVICE)
         self.relu = nn.ReLU()
         self.conv2 = nn.Conv3d(
-            channels, outputDim[1], kernel, padding=[4, 1, 0]).to(DEVICE)
+            channels, outputDim[0], kernel, padding=[4, 1, 0]).to(DEVICE)
 
-    def synthesisBlock(self, generatedCurves, latentStyle, index):
-        noiseDim = list(self.outputDim)
+    def synthesisBlock(self, noiseDim, generatedCurves, latentStyle, index):
         noiseDim[1] = self.channels
         generatedCurves = generatedCurves \
             + torch.randn(noiseDim).to(self.DEVICE)*self.noiseScales[index]
@@ -101,12 +100,13 @@ class SynthesisNetwork(nn.Module):
         generatedCurves = self.relu(self.convolutions[index](generatedCurves))
         return generatedCurves
 
-    def forward(self, latentStyle):
-        generatedCurves = torch.zeros(self.outputDim).to(self.DEVICE)
+    def forward(self, batchSize, latentStyle):
+        outDim = [batchSize]  + list(self.outputDim)
+        generatedCurves = torch.zeros(outDim).to(self.DEVICE)
         # got to do first convolution to get it up to the right channel size
         generatedCurves = self.conv1(generatedCurves)
         for i in range(self.numBlocks):
-            generatedCurves = self.synthesisBlock(generatedCurves, latentStyle,
+            generatedCurves = self.synthesisBlock(outDim,generatedCurves, latentStyle,
                                                   i)
         generatedCurves = self.conv2(generatedCurves)
         return generatedCurves
@@ -114,17 +114,17 @@ class SynthesisNetwork(nn.Module):
 
 class Matzah(nn.Module):
     def __init__(self, DEVICE, fcSize, numFC, styleDim, outputDim, numBlocks,
-                 startDim, channels, kernel, numClasses):
+                  channels, kernel, numClasses):
         super(Matzah, self).__init__()
         self.Style = StyleNetwork(DEVICE, fcSize, numFC, styleDim)
         self.Synthesis = SynthesisNetwork(DEVICE, outputDim,
                                           fcSize + numClasses, numBlocks,
-                                          startDim, channels, kernel)
+                                           channels, kernel)
 
     def forward(self, styleVec, classVec):
         latentStyle = self.Style.forward(styleVec, classVec)
         # now need to set up the other side of the network.
-        generatedCurves = self.Synthesis.forward(latentStyle)
+        generatedCurves = self.Synthesis.forward(styleVec.shape[0], latentStyle)
         return generatedCurves
 
 

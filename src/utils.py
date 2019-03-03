@@ -52,8 +52,8 @@ def rasterize(x, resolution=64, sigma=0.01, device='cuda'):
     YY = np.flip(YY)
     XX_expanded = XX[:, :, np.newaxis]
     YY_expanded = YY[:, :, np.newaxis]
-    x_meshgrid = torch.Tensor(XX_expanded / resolution).to(device)
-    y_meshgrid = torch.Tensor(YY_expanded / resolution).to(device)
+    x_meshgrid = torch.tensor(XX_expanded / resolution, requires_grad=False, dtype=torch.float).to(device)
+    y_meshgrid = torch.tensor(YY_expanded / resolution, requires_grad=False, dtype=torch.float).to(device)
 
     batch_size = x.size()[0]
     num_samples = x.size()[1]
