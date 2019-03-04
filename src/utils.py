@@ -13,6 +13,30 @@ CHARACTERS = [
 ]
 
 
+def make_stop_signal(x, dim=2, gain=1.0):
+    '''
+    A monotonic increasing function. A softmax followed by a cumsum.
+
+    Parameters
+    ----------
+    x : torch.Tensor.
+        Input. Usually shape [batch_size, 20, 30, 3, 2], although this is not
+        required.
+    dim : int
+        Dimension along which to be monotonically increasing. Defaults to 2, the
+        closed contour dimension.
+    gain : float
+        Gain. The higher the gain, the thinner the "transition band" of the stop
+        signal.
+
+    Returns
+    -------
+    output : torch.Tensor
+        Same shape as x.
+    '''
+    return (gain * x).softmax(dim=dim).cumsum(dim=dim)
+
+
 def rasterize(x, resolution=64, sigma=0.01, device='cuda'):
     '''
     Simple rasterization: drop a single Gaussian at every control point.
@@ -52,8 +76,12 @@ def rasterize(x, resolution=64, sigma=0.01, device='cuda'):
     YY = np.flip(YY)
     XX_expanded = XX[:, :, np.newaxis]
     YY_expanded = YY[:, :, np.newaxis]
-    x_meshgrid = torch.tensor(XX_expanded / resolution, requires_grad=False, dtype=torch.float).to(device)
-    y_meshgrid = torch.tensor(YY_expanded / resolution, requires_grad=False, dtype=torch.float).to(device)
+    x_meshgrid = torch.tensor(
+        XX_expanded / resolution, requires_grad=False,
+        dtype=torch.float).to(device)
+    y_meshgrid = torch.tensor(
+        YY_expanded / resolution, requires_grad=False,
+        dtype=torch.float).to(device)
 
     batch_size = x.size()[0]
     num_samples = x.size()[1]
