@@ -107,7 +107,9 @@ def main(argv):
             print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, loss_))
 
         # Validate at the end of every epoch.
+        net.eval()
         validate(net, epoch)
+        net.train()
 
     print('Finished.')
 
