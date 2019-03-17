@@ -6,7 +6,7 @@ from torch import nn, autograd
 from torch.utils import data
 from serialization.fontDataset import Dataset
 import pantry
-from utils import CHARACTERS, save_model
+from utils import CHARACTERS, save_model, rasterize
 from infer import infer
 
 np.set_printoptions(threshold=np.inf)  # Print full confusion matrix.
@@ -18,6 +18,18 @@ flags.DEFINE_string("gen", None, "Pastry name of generator and optimizer")
 flags.mark_flag_as_required("gen")
 flags.DEFINE_integer("batch", 16, "Batch: indicates batch size")
 flags.DEFINE_integer("epochs", 2, "Number of epochs to train for")
+flags.DEFINE_integer(
+    "fcSize", 128, "Size of the fully connected layers in the style network")
+flags.DEFINE_integer("numFC", 3, "Number of fc layers in the style network")
+flags.DEFINE_integer("styleDim", 100, "the output dimension for the style net")
+flags.DEFINE_integer("numBlocks", 3, "number of conv blocks in synthesis net")
+flags.DEFINE_integer("channels", 32,
+                     "number of channels in each of the conv blocks")
+flags.DEFINE_list("outputDim", [20, 30, 2, 2],
+                  "output dimension of produced glyph")
+flags.DEFINE_list("kernelDim", [9, 3, 1],
+                  "Dimension of kernel in synthesis net block")
+flags.DEFINE_integer("numClasses", 70, "number of different glyphs")
 flags.DEFINE_float("clip", 3.0, "Value to clip norm of gradients at")
 
 DATA_PATH = '/flour/noCapsnoRepeatsSingleExampleProtos/'
@@ -28,7 +40,7 @@ CLASS_INDEX = {label: x for x, label in enumerate(CHARACTERS)}
 FONT_FILES = glob(DATA_PATH + '*')  # List of paths to protobuf files
 
 
-def compute_gradient_penalty(discriminator, real_samples, fake_samples):
+def compute_gradients(discriminator, real_samples, fake_samples):
     """
     Calculates the gradient penalty loss for WGAN-GP.
 
@@ -37,26 +49,27 @@ def compute_gradient_penalty(discriminator, real_samples, fake_samples):
     discriminator : torch.nn.Module
         Discriminator PyTorch module.
 
-    real_samples : [N, _, _, _, _]
-        True data. Zeroth dimension must be the batch dimension.
+    real_samples : [N, resolution, resolution]
+        Raster of real glyph. Zeroth dimension must be the batch dimension.
 
-    fake_samples : [N, _, _, _, _]
-        Generated samples. Zeroth dimension must be the batch dimension.
+    fake_samples : [N, resolution, resolution]
+        Raster of fake glyph. Zeroth dimension must be the batch dimension.
 
     Returns
     -------
-    gradient_penalty : float
-        Gradient penalty to enforce 1-Lipschitz condition.
+    gradient_deviation : float
+        Gradient deviation from 1. Must take mean of square to obtain gradient
+        penalty.
     """
 
     # Random weight term for interpolation between real and fake samples
-    alpha = torch.randint(2, [real_samples.size(0), 1, 1, 1, 1]).type(
+    alpha = torch.randint(2, [real_samples.size(0), 1, 1]).type(
         torch.cuda.FloatTensor).to(FLAGS.device)
     # Get random interpolation between real and fake samples
     interpolates = (
         alpha * real_samples + (1 - alpha) * fake_samples).requires_grad_(True)
 
-    d_interpolates = discriminator(interpolates)
+    d_interpolates = discriminator(interpolates, raster_input=True)
     fake = autograd.Variable(
         torch.ones([real_samples.shape[0], 70]),
         requires_grad=False).type(torch.cuda.FloatTensor).to(FLAGS.device)
@@ -71,9 +84,7 @@ def compute_gradient_penalty(discriminator, real_samples, fake_samples):
         only_inputs=True,
     )[0]
 
-    gradients = gradients.view(gradients.size(0), -1)
-    gradient_penalty = ((gradients.norm(2, dim=1) - 1)**2).mean()
-    return gradient_penalty
+    return gradients.view(gradients.size(0), -1)
 
 
 def main(argv):
@@ -88,17 +99,19 @@ def main(argv):
         pin_memory=True)
 
     disc = pantry.disc[FLAGS.disc](FLAGS.device).to(FLAGS.device)
+    kernelDim = [int(x) for x in FLAGS.kernelDim]
+    outputDim = [int(x) for x in FLAGS.outputDim]
     gen = pantry.gen[FLAGS.
                      gen](  # All these flags are specifically for matzah.
                          FLAGS.device,
-                         fcSize=128,
-                         numFC=3,
-                         styleDim=100,
-                         outputDim=(20, 30, 3, 2),
-                         numBlocks=3,
-                         channels=32,
-                         kernel=(9, 3, 1),
-                         numClasses=70).to(FLAGS.device)
+                         fcSize=FLAGS.fcSize,
+                         numFC=FLAGS.numFC,
+                         styleDim=FLAGS.styleDim,
+                         outputDim=outputDim,
+                         numBlocks=FLAGS.numBlocks,
+                         channels=FLAGS.channels,
+                         kernel=kernelDim,
+                         numClasses=FLAGS.numClasses).to(FLAGS.device)
     optimizer_disc = pantry.optimsDisc[FLAGS.disc](disc)
     optimizer_gen = pantry.optimsGen[FLAGS.gen](gen)
     num_epochs = FLAGS.epochs
@@ -130,9 +143,23 @@ def main(argv):
             real_validity = disc(real_chars)  # Real characters
             fake_validity = disc(fake_chars)  # Fake characters
 
-            # Gradient penalty
-            gradient_penalty = compute_gradient_penalty(
-                disc, real_chars, fake_chars)
+            # Gradient penalty. Calculate glyph by glyph to avoid OOM
+            all_gradients = []
+            for real_char, fake_char in zip(real_chars, fake_chars):
+                real_char = real_char.view(1, -1, 2)
+                real_char_raster = rasterize(real_char, device=FLAGS.device)
+                real_char_raster = real_char_raster.unsqueeze(1)
+
+                points = torch.cat(
+                    [curve for contour in fake_char for curve in contour])
+                points = points.unsqueeze(0)
+                fake_char_raster = rasterize(points, device=FLAGS.device)
+                fake_char_raster = fake_char_raster.unsqueeze(1)
+
+                gradients = compute_gradients(disc, real_char_raster, fake_char_raster)
+                all_gradients.append(gradients)
+
+            gradient_penalty = ((torch.cat(all_gradients, dim=0).norm(dim=1) - 1)**2).mean()
 
             # Discriminator loss
             loss_disc = -torch.mean(real_validity) + torch.mean(

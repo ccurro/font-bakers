@@ -16,16 +16,32 @@ class Eggtart(nn.Module):
         self.sigma = sigma
         self.device = device
 
-    def forward(self, x):
-        # x.shape = [batch_size, 20, 30, 3, 2]
-        # `forward` must return shape [batch_size, 70]
-        x = x.squeeze()
-        batch_size = x.shape[0]
-        x = x.view(batch_size, -1, 2)
-        x = rasterize(x, device=self.device)
-        x = x.unsqueeze(1)
-        x = self.resnet(x)
-        return x
+    def forward(self, x, raster_input=False):
+        if not raster_input:
+            if isinstance(x, torch.Tensor):
+                # x.shape = [batch_size, 20, 30, 3, 2]
+                # `forward` must return shape [batch_size, 70]
+                x = x.squeeze()
+                batch_size = x.shape[0]
+                x = x.view(batch_size, -1, 2)
+                rasters = rasterize(x, device=self.device)
+            elif isinstance(x, list):
+                rasters = []
+                # Rasterize glyph by glyph, due to variable number of curves
+                for glyph in x:
+                    # points.shape == [N, 2], where N = num_contours * num_curves * 3
+                    points = torch.cat(
+                        [curve for contour in glyph for curve in contour])
+                    points = points.unsqueeze(0)
+                    raster = rasterize(points, device=self.device)
+                    rasters.append(raster)
+                rasters = torch.cat(rasters, dim=0)
+            rasters = rasters.unsqueeze(1)
+        else:
+            rasters = x
+
+        clf = self.resnet(rasters)
+        return clf
 
 
 def eggtart_optimizer(net):
