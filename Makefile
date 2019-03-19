@@ -2,6 +2,7 @@
 
 PYTHON = python3.5
 SHELL = bash
+VENV_PATH = venv
 
 init:
 	find .git/hooks -type l -exec rm {} \;
@@ -11,14 +12,8 @@ init:
 	mkdir output/fonts/
 
 venv:
-	( \
-	rm -Rf venv; \
-	${PYTHON} -m venv venv; \
-	source venv/bin/activate; \
-	pip install --upgrade pip; \
-	pip install -r requirements.txt; \
-	deactivate; \
-	)
+	rm -Rf ${VENV_PATH}
+	bash env_setup.sh ${PYTHON} ${VENV_PATH}
 
 format:
 	yapf --in-place -r src/ -e src/serialization/font_pb2.py -e src/serialization/font.proto
