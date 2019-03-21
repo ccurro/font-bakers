@@ -3,14 +3,15 @@
 import numpy as np
 
 def get_single_example():
+    category = np.random.randint(0, 3)    
     num_contours = np.random.randint(1, 4)
     contours = []
     for _ in range(num_contours):
         num_curves = np.random.randint(10, 15)
-        contour = np.random.uniform(size=(num_curves, 6))
+        contour = np.random.normal(size=(num_curves, 6))*0.1 + category
         contours.append(contour)
 
-    return contours
+    return contours, category
 
 def pad_arrays(l):
     pad_length = max([a.shape[0] for a in l])
@@ -31,13 +32,13 @@ def get_batch(batch_size):
     third_contours = []
 
     for i in indices:
-        first_contours.append(batch[i][0])
+        first_contours.append(batch[i][0][0])
         try:
-            second_contours.append(batch[i][1])
+            second_contours.append(batch[i][0][1])
         except IndexError:
             continue
         try:
-            third_contours.append(batch[i][2])
+            third_contours.append(batch[i][0][2])
         except IndexError:
             continue
         
