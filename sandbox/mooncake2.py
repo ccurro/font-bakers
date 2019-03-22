@@ -6,8 +6,10 @@ from torch import nn, optim
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
-DEVICE = "cuda"
-NUM_TRAIN_ITERATIONS = 2000
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+BATCH_SIZE = 512
+NUM_BLOCKS = 16
+NUM_TRAIN_ITERATIONS = 10000
 SEED_LENGTH = 20
 
 
@@ -68,9 +70,9 @@ def generate_sinewaves(batch_size,
     """
     sinewaves = []
     for i in range(batch_size):
-        n = 100  # FIXME np.random.randint(50, 150)
-        f = 1
-        phi = 0
+        n = np.random.randint(50, 150)
+        f = np.random.uniform(0.8, 1.2)
+        phi = np.random.uniform(0.1, 0.5)
         x = np.linspace(0, num_periods / f, n, dtype=np.float32)
         sinewave = np.sin(2 * np.pi * f * (x + phi))
         pad_length = max_num_samples - len(sinewave)
@@ -140,15 +142,15 @@ class ResidualBlock(nn.Module):
 
 
 class Mooncake(nn.Module):
-    # TODO tweak parameters
     def __init__(
             self,
             in_channels=1,
+            max_num_samples=200,
             num_channels=4,
             num_blocks=8,
             kernel_size=2,
             dilations=[1, 2, 4, 8, 16, 32, 64, 128],
-            num_components=5,
+            num_components=1,
     ):
         super(Mooncake, self).__init__()
 
@@ -157,11 +159,13 @@ class Mooncake(nn.Module):
                    "blocks.")
             raise ValueError(msg)
 
+        self.max_num_samples = max_num_samples
         self.num_channels = num_channels
         self.num_blocks = num_blocks
 
+        # Coordconv adds 1 to `in_channels`
         self.conv1 = CausalConv1d(
-            in_channels, num_channels, kernel_size=kernel_size, dilation=1)
+            in_channels + 1, num_channels, kernel_size=kernel_size, dilation=1)
         self.conv2 = nn.Conv1d(num_channels, 2 * num_channels, kernel_size=1)
 
         self.blocks = nn.ModuleList([
@@ -172,11 +176,11 @@ class Mooncake(nn.Module):
         ])
 
         self.conv_pi = nn.Conv1d(
-            2 * num_channels, num_components + 1, kernel_size=1, bias=False)
+            2 * num_channels, num_components + 1, kernel_size=1)
         self.conv_mu = nn.Conv1d(
-            2 * num_channels, num_components, kernel_size=1, bias=False)
+            2 * num_channels, num_components, kernel_size=1)
         self.conv_sigma = nn.Conv1d(
-            2 * num_channels, num_components, kernel_size=1, bias=False)
+            2 * num_channels, num_components, kernel_size=1)
 
     def forward(self, x):
         """
@@ -191,6 +195,14 @@ class Mooncake(nn.Module):
             Mixture weights, means and standard deviations of each Gaussian
             component, respectively.
         """
+        batch_size = x.shape[0]
+        num_samples = x.shape[2]
+        linspace = torch.tensor(
+            np.tile(
+                np.linspace(0, num_samples / self.max_num_samples,
+                            num_samples),
+                [batch_size, 1])).unsqueeze(1).float().to(DEVICE)
+        x = torch.cat([x, linspace], dim=1)
 
         taps = [self.conv1(x)]
 
@@ -198,32 +210,33 @@ class Mooncake(nn.Module):
             tap = self.blocks[i](taps[i])
             taps.append(tap)
 
-        aggregated_blocks = F.relu(torch.stack(taps).sum(dim=0))
+        aggregated_blocks = F.relu(torch.stack(taps).mean(dim=0))
         z = self.conv2(aggregated_blocks)
 
         pi = F.softmax(self.conv_pi(z), dim=1)
-        mu = torch.tanh(self.conv_mu(z))
+        mu = 2 * torch.tanh(self.conv_mu(z) / 2)
         sigma = F.softplus(self.conv_sigma(z))
 
         return pi, mu, sigma
 
 
 if __name__ == "__main__":
-    torch.set_default_tensor_type(torch.FloatTensor)
     np.random.seed(1618)
     torch.manual_seed(1618)
 
-    batch_size = 16
-
-    mooncake = Mooncake().to(DEVICE)
-    optimizer = optim.Adam(mooncake.parameters(), lr=0.001)
+    dilations = [2**i for i in range(NUM_BLOCKS)]
+    mooncake = Mooncake(num_blocks=NUM_BLOCKS, dilations=dilations).to(DEVICE)
+    optimizer = optim.Adam(mooncake.parameters(), lr=0.002)
+    num_trainable_params = sum(
+        p.numel() for p in mooncake.parameters() if p.requires_grad)
+    print("# trainable parameters: {}".format(num_trainable_params))
 
     # Train
     mooncake.train()
 
     for i in range(NUM_TRAIN_ITERATIONS):
         # Generate one sinewave and make a batch out of it.
-        sinewaves = generate_sinewaves(batch_size)
+        sinewaves = generate_sinewaves(BATCH_SIZE)
         pi, mu, sigma = mooncake(sinewaves)
 
         # Update
@@ -232,30 +245,39 @@ if __name__ == "__main__":
         nlogp.backward()
         optimizer.step()
 
-        if i % 100 == 0:
+        if i % 10 == 0:
             print("[{}] nlogp: {}".format(i,
                                           nlogp.cpu().detach().numpy().item()))
         del nlogp
 
-    # Infer
-    mooncake.eval()
+        if i % 500 == 499:
+            # Infer
+            mooncake.eval()
+            fig, ax = plt.subplots()
 
-    with torch.no_grad():
-        ground_truth = generate_sinewaves(1)
-        inferred = torch.zeros_like(ground_truth)
-        inferred[..., :SEED_LENGTH] = ground_truth[..., :SEED_LENGTH]
+            for c in ['r', 'b', 'g']:
+                with torch.no_grad():
+                    ground_truth = generate_sinewaves(1)
+                    inferred = torch.zeros_like(ground_truth)
+                    inferred[..., :SEED_LENGTH] = ground_truth[..., :
+                                                               SEED_LENGTH]
 
-        for i in range(SEED_LENGTH, inferred.shape[-1]):
-            pi, mu, sigma = mooncake(inferred[..., :i])
+                    for j in range(SEED_LENGTH, inferred.shape[-1]):
+                        pi, mu, sigma = mooncake(inferred[..., :j])
 
-            pi = pi[:, 1:, -1]
-            mu = mu[..., -1]
-            sigma = sigma[..., -1]
-            inferred[..., i] = (pi * mu).sum(dim=1)
+                        pi = pi[:, 1:, -1]
+                        mu = mu[..., -1]
+                        sigma = sigma[..., -1]
+                        inferred[..., j] = (pi * mu).sum(dim=1)
 
-    fig, ax = plt.subplots()
-    ax.plot(
-        ground_truth.cpu().detach().numpy().squeeze(), label="ground truth")
-    ax.plot(inferred.cpu().detach().numpy().squeeze(), label="inferred")
-    ax.legend()
-    plt.savefig("foo.png")
+                ax.plot(
+                    ground_truth.cpu().detach().numpy().squeeze(),
+                    color=c,
+                    linestyle='dashed',
+                    alpha=0.3)
+                ax.plot(
+                    inferred.cpu().detach().numpy().squeeze(),
+                    color=c,
+                    linestyle='solid')
+
+            plt.savefig("inference_{}.png".format(i))
