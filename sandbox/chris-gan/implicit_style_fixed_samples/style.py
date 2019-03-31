@@ -9,9 +9,9 @@ def AdaIN(x, gains, biases):
     assert len(x.shape) == 3
     eps = 1e-8
     mean = x.mean(2, keepdim=True)
-    stddev = torch.sqrt(x.var(2, keepdim=True))
+    rstddev = torch.rsqrt(x.var(2, keepdim=True) + eps)
 
-    normed = (x - mean) / (stddev + eps)
+    normed = (x - mean) * rstddev
 
     return gains * normed + biases
 
@@ -111,7 +111,8 @@ class StyleNet(nn.Module):
 
         implicits = self.out(a)
 
-        return torch.cat([torch.roll(implicits[:, 2:, :], 1, dims=-1), implicits], dim=1)
+        return torch.cat(
+            [torch.roll(implicits[:, 2:, :], 1, dims=-1), implicits], dim=1)
 
 
 if __name__ == '__main__':
