@@ -86,7 +86,7 @@ class Path(nn.Module):
         taps = [self.conv1(x)]
 
         for i in range(self.num_blocks):
-            tap = self.blocks[i](taps[i])
+            tap = F.avg_pool1d(self.blocks[i](taps[i]), 2, 2)
             taps.append(tap)
 
         z = self.conv2(taps[-1])
