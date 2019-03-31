@@ -29,8 +29,7 @@ class StyleBlock(nn.Module):
         self.init_width = init_width
         if initial:
             self.initial = nn.parameter.Parameter(
-                torch.randn(1, num_channels), requires_grad=True)
-            self.init_fc = nn.Linear(num_channels, num_channels * init_width)
+                torch.randn(1, num_channels, init_width), requires_grad=True)
 
         self.noise_gain = nn.parameter.Parameter(
             torch.zeros(1, num_channels, 1), requires_grad=True)
@@ -46,9 +45,7 @@ class StyleBlock(nn.Module):
 
     def forward(self, style, x=None):
         if x is None:
-            a = self.conv1(
-                self.init_fc(self.initial).reshape(1, self.num_channels,
-                                                   self.init_width))
+            a = self.conv1(self.initial)
         else:
             a = self.conv1(x)
 

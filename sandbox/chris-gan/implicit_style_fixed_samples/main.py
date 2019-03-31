@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
     batch_size = 512
     z_dim = 16
-    num_curves = 64  # pow 2 ish
+    num_curves = 32  # pow 2 ish
     style_dim = 128
     num_blocks = 8
     num_channels = 32
@@ -106,8 +106,8 @@ if __name__ == "__main__":
 
     disc = Discriminator()
 
-    num_pts = int(640 / num_curves)
-    ds = Dataset("../data/with_640_samples/")
+    num_pts = 5 #int(32*5 / num_curves)
+    ds = Dataset("../data/with_160_samples/")
     dl = data.DataLoader(
         ds,
         batch_size=batch_size,
