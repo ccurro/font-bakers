@@ -94,7 +94,6 @@ class Path(nn.Module):
         tap = self.conv1(x)
 
         for i in range(self.num_blocks):
-            print(i)
             tap = F.avg_pool1d(self.blocks[i](tap), 2, 2)
             tap = F.relu(self.convs[i](tap))
 

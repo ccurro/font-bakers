@@ -15,7 +15,7 @@ from nnlib import Path
 from util import raster
 from FixedSizeFontData import Dataset
 
-from style import StyleNet
+from style import StyleNet, MappingNet
 from discriminator import Discriminator
 
 import matplotlib 
@@ -56,8 +56,8 @@ class Generator(nn.Module):
         self.style_net3 = StyleNet(num_curves, num_blocks, style_dim, z_dim,
                                    num_channels)
 
-    def forward(self, z):
-        return self.style_net1(z), self.style_net2(z), self.style_net3(z)
+    def forward(self, z, mapping):
+        return self.style_net1(z, mapping), self.style_net2(z, mapping), self.style_net3(z, mapping)
 
 
 def cycle(iterable):
@@ -78,6 +78,7 @@ if __name__ == "__main__":
 
     z_test = torch.randn(1, z_dim)
 
+    mapping = MappingNet(z_dim, style_dim, 4)
     gen = Generator(num_curves, num_blocks, style_dim, z_dim, num_channels)
 
     disc = Discriminator()
@@ -91,8 +92,12 @@ if __name__ == "__main__":
         pin_memory=True,
         shuffle=True)
 
-    optim_gen = optim.Adam(gen.parameters(), 2e-4, [0.5, 0.9])
-    optim_disc = optim.Adam(disc.parameters(), 2e-4, [0.5, 0.9])
+    optim_gen = optim.Adam([
+        {'params': mapping.parameters(), 'lr' = 1e-5},
+        {'params': gen.parameters()}
+        ]
+        , 1e-4, [0.5, 0.9])
+    optim_disc = optim.Adam(disc.parameters(), 5e-5, [0.5, 0.9])
 
     tic = time()
     for i, real_data in enumerate(iter(cycle(dl))):
@@ -101,7 +106,7 @@ if __name__ == "__main__":
             for _ in range(1):
                 z = torch.randn(real_data.shape[0], z_dim)
                 optim_gen.zero_grad()
-                a, b, c = gen(z)
+                a, b, c = gen(z, mapping)
                 fake_data = torch.stack([
                     sample_qb(a, num_pts),
                     sample_qb(b, num_pts),
@@ -118,7 +123,7 @@ if __name__ == "__main__":
         with torch.no_grad():
             gen.eval()
             z = torch.randn(real_data.shape[0], z_dim)
-            a, b, c = gen(z)
+            a, b, c = gen(z, mapping)
             fake_data = torch.stack([
                 sample_qb(a, num_pts),
                 sample_qb(b, num_pts),
@@ -144,7 +149,7 @@ if __name__ == "__main__":
         if i % 100 == 0:
             gen.eval()
             for j in range(1):
-                a, b, c = gen(z_test)
+                a, b, c = gen(z_test, mapping)
                 a = a.cpu().detach().numpy().transpose(0, 2, 1).reshape(
                     -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
                 b = b.cpu().detach().numpy().transpose(0, 2, 1).reshape(

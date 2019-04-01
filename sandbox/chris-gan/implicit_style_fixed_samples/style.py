@@ -83,7 +83,6 @@ class StyleNet(nn.Module):
         init_width = int(num_curves / 2**(num_blocks / 2))
         print("init_width:", init_width)
 
-        self.mapping = MappingNet(z_dim, style_dim, 4)
         self.styleblock1 = StyleBlock(
             num_channels,
             style_dim=style_dim,
@@ -97,8 +96,8 @@ class StyleNet(nn.Module):
 
         self.out = nn.Conv1d(num_channels, 4, kernel_size=1)
 
-    def forward(self, z):
-        style = self.mapping(z)
+    def forward(self, z, mapping):
+        style = mapping(z)
         a = self.styleblock1(style)
         a = self.styleblock2(style, x=a)
 
