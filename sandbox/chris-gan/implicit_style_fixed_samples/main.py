@@ -16,6 +16,7 @@ from util import raster
 from FixedSizeFontData import Dataset
 
 from style import StyleNet
+from discriminator import Discriminator
 
 import matplotlib 
 matplotlib.use('Agg') 
@@ -43,31 +44,6 @@ def sample_qb(control_points, steps):
     samples = samples.reshape(batch_size, -1, 2).transpose(-1, -2)
 
     return samples
-
-
-class Discriminator(nn.Module):
-    def __init__(self, in_channels=2, num_channels=32):
-        super(Discriminator, self).__init__()
-        self.a = Path(in_channels=in_channels, num_channels=num_channels)
-        self.b = Path(in_channels=in_channels, num_channels=num_channels)
-        self.c = Path(in_channels=in_channels, num_channels=num_channels)
-
-        self.fc = nn.Linear(num_channels * 3, 1)
-        for m in self.modules():
-            if 'weight' in m._parameters:
-                nn.utils.spectral_norm(m)
-
-    def forward(self, x):
-        a = x[:, 0, ...]
-        b = x[:, 1, ...]
-        c = x[:, 2, ...]
-
-        #feats = torch.cat([self.a(a), self.b(b), self.c(c)], dim=1).reshape(a.shape[0], -1)#.mean(dim=2)
-        feats = torch.cat([self.a(a), self.b(b), self.c(c)], dim=1).mean(dim=2)
-        logits = self.fc(feats)
-
-        return logits
-
 
 class Generator(nn.Module):
     def __init__(self, num_curves, num_blocks, style_dim, z_dim, num_channels):
