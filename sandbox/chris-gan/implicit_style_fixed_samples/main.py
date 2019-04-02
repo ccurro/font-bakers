@@ -18,8 +18,8 @@ from FixedSizeFontData import Dataset
 from style import StyleNet, MappingNet
 from discriminator import Discriminator
 
-import matplotlib 
-matplotlib.use('Agg') 
+import matplotlib
+matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
 
@@ -45,6 +45,7 @@ def sample_qb(control_points, steps):
 
     return samples
 
+
 class Generator(nn.Module):
     def __init__(self, num_curves, num_blocks, style_dim, z_dim, num_channels):
         super(Generator, self).__init__()
@@ -57,7 +58,8 @@ class Generator(nn.Module):
                                    num_channels)
 
     def forward(self, z, mapping):
-        return self.style_net1(z, mapping), self.style_net2(z, mapping), self.style_net3(z, mapping)
+        return self.style_net1(z, mapping), self.style_net2(
+            z, mapping), self.style_net3(z, mapping)
 
 
 def cycle(iterable):
@@ -83,7 +85,7 @@ if __name__ == "__main__":
 
     disc = Discriminator()
 
-    num_pts = 5 #int(32*5 / num_curves)
+    num_pts = 5  #int(32*5 / num_curves)
     ds = Dataset("../data/with_160_samples/")
     dl = data.DataLoader(
         ds,
@@ -92,11 +94,12 @@ if __name__ == "__main__":
         pin_memory=True,
         shuffle=True)
 
-    optim_gen = optim.Adam([
-        {'params': mapping.parameters(), 'lr' = 1e-5},
-        {'params': gen.parameters()}
-        ]
-        , 1e-4, [0.5, 0.9])
+    optim_gen = optim.Adam([{
+        'params': mapping.parameters(),
+        'lr': 1e-5
+    }, {
+        'params': gen.parameters()
+    }], 1e-4, [0.5, 0.9])
     optim_disc = optim.Adam(disc.parameters(), 5e-5, [0.5, 0.9])
 
     tic = time()
