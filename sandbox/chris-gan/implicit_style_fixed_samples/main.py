@@ -2,6 +2,7 @@
 
 from time import time
 
+import os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -13,6 +14,7 @@ from torch.utils import data
 
 from nnlib import Path
 from util import raster
+from walk import walk
 from FixedSizeFontData import Dataset
 
 from style import StyleNet, MappingNet
@@ -78,7 +80,7 @@ if __name__ == "__main__":
     num_blocks = 8
     num_channels = 32
 
-    z_test = torch.randn(1, z_dim)
+    z_test = torch.tensor(walk(z_dim, num_samples=300))
 
     mapping = MappingNet(z_dim, style_dim, 4)
     gen = Generator(num_curves, num_blocks, style_dim, z_dim, num_channels)
@@ -149,18 +151,21 @@ if __name__ == "__main__":
               "{0:.2f}s".format(time() - tic))
         tic = time()
 
-        if i % 100 == 0:
+        if i % 1000 == 0:
             gen.eval()
-            for j in range(1):
-                a, b, c = gen(z_test, mapping)
-                a = a.cpu().detach().numpy().transpose(0, 2, 1).reshape(
+            a_, b_, c_ = gen(z_test, mapping)            
+            for j, (a,b,c) in enumerate(zip(a_, b_, c_)):
+                a = a.cpu().detach().numpy().transpose(1, 0).reshape(
                     -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
-                b = b.cpu().detach().numpy().transpose(0, 2, 1).reshape(
+                b = b.cpu().detach().numpy().transpose(1, 0).reshape(
                     -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
-                c = c.cpu().detach().numpy().transpose(0, 2, 1).reshape(
+                c = c.cpu().detach().numpy().transpose(1, 0).reshape(
                     -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
 
                 raster([[a, b, c]])
-                plt.savefig("outs/test{:010d}.png".format(i))
+                directory = "outs/{:010d}/".format(i)
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                plt.savefig("outs/{:010d}/test{:04d}.png".format(i, j))
                 plt.close()
             gen.train()
