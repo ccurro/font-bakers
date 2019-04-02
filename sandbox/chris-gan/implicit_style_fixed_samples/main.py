@@ -98,11 +98,11 @@ if __name__ == "__main__":
 
     optim_gen = optim.Adam([{
         'params': mapping.parameters(),
-        'lr': 1e-5
+        'lr': 1e-4
     }, {
         'params': gen.parameters()
-    }], 1e-4, [0.5, 0.9])
-    optim_disc = optim.Adam(disc.parameters(), 5e-5, [0.5, 0.9])
+    }], 1e-3, [0.5, 0.9])
+    optim_disc = optim.Adam(disc.parameters(), 5e-3, [0.5, 0.9])
 
     tic = time()
     for i, real_data in enumerate(iter(cycle(dl))):
@@ -151,10 +151,10 @@ if __name__ == "__main__":
               "{0:.2f}s".format(time() - tic))
         tic = time()
 
-        if i % 1000 == 0:
+        if (i % 10000 == 0) and (i > 0):
             gen.eval()
-            a_, b_, c_ = gen(z_test, mapping)            
-            for j, (a,b,c) in enumerate(zip(a_, b_, c_)):
+            a_, b_, c_ = gen(z_test, mapping)
+            for j, (a, b, c) in enumerate(zip(a_, b_, c_)):
                 a = a.cpu().detach().numpy().transpose(1, 0).reshape(
                     -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
                 b = b.cpu().detach().numpy().transpose(1, 0).reshape(
