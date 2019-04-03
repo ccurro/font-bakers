@@ -68,10 +68,10 @@ class MappingNet(nn.Module):
             [nn.Linear(width, width) for _ in range(num_layers)])
 
     def forward(self, z):
-        a = F.elu(self.fc(z))
+        a = F.leaky_relu(self.fc(z), 0.2)
 
         for layer in self.layers:
-            a = F.elu(a)
+            a = F.leaky_relu(layer(a), 0.2)
 
         return a
 

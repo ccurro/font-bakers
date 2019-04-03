@@ -98,11 +98,11 @@ if __name__ == "__main__":
 
     optim_gen = optim.Adam([{
         'params': mapping.parameters(),
-        'lr': 1e-4
+        'lr': 2e-5
     }, {
         'params': gen.parameters()
-    }], 1e-3, [0.5, 0.9])
-    optim_disc = optim.Adam(disc.parameters(), 5e-3, [0.5, 0.9])
+    }], 2e-4, [0.5, 0.9])
+    optim_disc = optim.Adam(disc.parameters(), 2e-4, [0.5, 0.9])
 
     tic = time()
     for i, real_data in enumerate(iter(cycle(dl))):
