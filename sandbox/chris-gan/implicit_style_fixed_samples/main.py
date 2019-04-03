@@ -12,7 +12,6 @@ import torch.optim as optim
 
 from torch.utils import data
 
-from nnlib import Path
 from util import raster
 from walk import walk
 from FixedSizeFontData import Dataset
@@ -160,7 +159,7 @@ if __name__ == "__main__":
                 -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
             c = c[2].cpu().detach().numpy().transpose(1, 0).reshape(
                 -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
-            
+
             raster([[a, b, c]])
             directory = "outs/continuous/".format(i)
             if not os.path.exists(directory):
