@@ -94,8 +94,8 @@ class Path(nn.Module):
         tap = self.conv1(x)
 
         for i in range(self.num_blocks):
-            #tap = F.avg_pool1d(self.blocks[i](tap), 2, 2)
-            tap = self.blocks[i](tap)
+            tap = F.avg_pool1d(self.blocks[i](tap), 2, 2)
+            #tap = self.blocks[i](tap)
             tap = F.relu(self.convs[i](tap))
 
         return tap
@@ -108,7 +108,7 @@ class Discriminator(nn.Module):
         self.b = Path(in_channels=in_channels, num_channels=num_channels)
         self.c = Path(in_channels=in_channels, num_channels=num_channels)
 
-        self.fc = nn.Linear(num_channels[-1] * 3, 1)
+        self.fc = nn.Linear(num_channels[-1] * 3 * 40, 1)
         for m in self.modules():
             if 'weight' in m._parameters:
                 nn.utils.spectral_norm(m)
@@ -119,7 +119,8 @@ class Discriminator(nn.Module):
         c = x[:, 2, ...]
 
         #feats = torch.cat([self.a(a), self.b(b), self.c(c)], dim=1).reshape(a.shape[0], -1)#.mean(dim=2)
-        feats = torch.cat([self.a(a), self.b(b), self.c(c)], dim=1).mean(dim=2)
+        feats = torch.cat([self.a(a), self.b(b), self.c(c)], dim=1).reshape(a.shape[0], -1)#.mean(dim=2)
+
         logits = self.fc(feats)
 
         return logits

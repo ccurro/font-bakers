@@ -90,7 +90,6 @@ def main(argv):
     git_hash = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip().decode("UTF-8")    
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
-
     batch_size = 256
     z_dim = 32
     num_curves = 64  # pow 2 ish
@@ -102,15 +101,15 @@ def main(argv):
     z_test_c = torch.randn(1, z_dim)
     z_test = torch.tensor(walk(z_dim, num_samples=300))
 
-    mapping = MappingNet(z_dim, style_dim, 4)
+    mapping = MappingNet(z_dim, style_dim, 2)
     gen = Generator(num_curves, num_blocks, style_dim, z_dim, num_channels)
 
     if FLAGS.test:
-        load(gen, "saved_models/{}/*".format(git_hash))
+        load(gen, "saved_models/gen/{}/*".format(git_hash))
+        load(mapping, "saved_models/mapping/{}/*".format(git_hash))        
         exit()
 
     disc = Discriminator()
-
 
     ds = Dataset("../data/with_640_samples/")
     dl = data.DataLoader(
@@ -131,7 +130,9 @@ def main(argv):
     tic = time()
     for i, real_data in enumerate(iter(cycle(dl))):
         real_data = real_data.cuda()
-        if i % 5 == 0:
+        if (i % 5 == 0) and (i > 0):
+            #print(real_data.shape)
+            #exit()
             for _ in range(1):
                 z = torch.randn(real_data.shape[0], z_dim)
                 optim_gen.zero_grad()
@@ -178,8 +179,8 @@ def main(argv):
         if (i % 100 == 0):
             gen.eval()
             
-            save(gen, 'saved_models/{}/{}.pt'.format(git_hash, i))
-            exit()
+            save(mapping, 'saved_models/{}/mapping/{}.pt'.format(git_hash, i))
+            save(gen, 'saved_models/{}/gen/{}.pt'.format(git_hash, i))            
             a, b, c = gen(z_test_c, mapping)
             a = a[0].cpu().detach().numpy().transpose(1, 0).reshape(
                 -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
@@ -196,7 +197,7 @@ def main(argv):
             plt.close()
             gen.train()
 
-        if (i % 10000 == 0):# and (i > 0):
+        if (i % 10000 == 0) and (i > 0):
             gen.eval()
             a_, b_, c_ = gen(z_test, mapping)
             for j, (a, b, c) in enumerate(zip(a_, b_, c_)):
