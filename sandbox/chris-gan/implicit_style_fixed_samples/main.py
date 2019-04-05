@@ -11,6 +11,7 @@ import torch.autograd as autograd
 import torch.optim as optim
 
 from torch.utils import data
+from glob import glob
 
 from util import raster
 from walk import walk
@@ -23,9 +24,14 @@ import matplotlib
 matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
+import subprocess
 
 from itertools import chain
 
+from absl import flags, app
+FLAGS = flags.FLAGS
+
+flags.DEFINE_bool("test", False, "Infer or train")
 
 def sample_qb(control_points, steps):
     """
@@ -34,7 +40,7 @@ def sample_qb(control_points, steps):
     batch_size = control_points.shape[0]
     num_curves = control_points.shape[2]
     cp = control_points.permute(0, 2, 1).reshape(-1, num_curves, 3, 2)
-    steps = torch.linspace(0, 1, steps).unsqueeze(0).unsqueeze(0).unsqueeze(0)
+    steps = torch.linspace(0.05, .95, steps).unsqueeze(0).unsqueeze(0).unsqueeze(0)
     P0 = cp[..., 0, :].unsqueeze(-1)
     P1 = cp[..., 1, :].unsqueeze(-1)
     P2 = cp[..., 2, :].unsqueeze(-1)
@@ -68,26 +74,45 @@ def cycle(iterable):
         for x in iterable:
             yield x
 
+def save(model, path):
+    if not os.path.exists(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
+                
+    torch.save(model.state_dict(), path)
 
-if __name__ == "__main__":
+def load(gen, path):
+    models = glob(path)
+    model_file = max(models, key=os.path.getctime)
+    gen.load_state_dict(torch.load(model_file))
+
+
+def main(argv):
+    git_hash = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip().decode("UTF-8")    
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
-    batch_size = 512
-    z_dim = 16
-    num_curves = 32  # pow 2 ish
-    style_dim = 128
+
+    batch_size = 256
+    z_dim = 32
+    num_curves = 64  # pow 2 ish
+    style_dim = 32
     num_blocks = 8
     num_channels = 32
+    num_pts = 10  #int(32*5 / num_curves)    
 
+    z_test_c = torch.randn(1, z_dim)
     z_test = torch.tensor(walk(z_dim, num_samples=300))
 
     mapping = MappingNet(z_dim, style_dim, 4)
     gen = Generator(num_curves, num_blocks, style_dim, z_dim, num_channels)
 
+    if FLAGS.test:
+        load(gen, "saved_models/{}/*".format(git_hash))
+        exit()
+
     disc = Discriminator()
 
-    num_pts = 5  #int(32*5 / num_curves)
-    ds = Dataset("../data/with_160_samples/")
+
+    ds = Dataset("../data/with_640_samples/")
     dl = data.DataLoader(
         ds,
         batch_size=batch_size,
@@ -97,11 +122,11 @@ if __name__ == "__main__":
 
     optim_gen = optim.Adam([{
         'params': mapping.parameters(),
-        'lr': 2e-5
+        'lr': 1e-5
     }, {
         'params': gen.parameters()
-    }], 2e-4, [0.5, 0.9])
-    optim_disc = optim.Adam(disc.parameters(), 2e-4, [0.5, 0.9])
+    }], 1e-3, [0.5, 0.9])
+    optim_disc = optim.Adam(disc.parameters(), 1e-3, [0.5, 0.9])
 
     tic = time()
     for i, real_data in enumerate(iter(cycle(dl))):
@@ -152,12 +177,15 @@ if __name__ == "__main__":
 
         if (i % 100 == 0):
             gen.eval()
-            a, b, c = gen(z_test, mapping)
+            
+            save(gen, 'saved_models/{}/{}.pt'.format(git_hash, i))
+            exit()
+            a, b, c = gen(z_test_c, mapping)
             a = a[0].cpu().detach().numpy().transpose(1, 0).reshape(
                 -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
-            b = b[1].cpu().detach().numpy().transpose(1, 0).reshape(
+            b = b[0].cpu().detach().numpy().transpose(1, 0).reshape(
                 -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
-            c = c[2].cpu().detach().numpy().transpose(1, 0).reshape(
+            c = c[0].cpu().detach().numpy().transpose(1, 0).reshape(
                 -1, 3, 2).transpose(0, 2, 1).astype(np.float64)
 
             raster([[a, b, c]])
@@ -168,7 +196,7 @@ if __name__ == "__main__":
             plt.close()
             gen.train()
 
-        if (i % 10000 == 0) and (i > 0):
+        if (i % 10000 == 0):# and (i > 0):
             gen.eval()
             a_, b_, c_ = gen(z_test, mapping)
             for j, (a, b, c) in enumerate(zip(a_, b_, c_)):
@@ -186,3 +214,6 @@ if __name__ == "__main__":
                 plt.savefig("outs/{:010d}/test{:04d}.png".format(i, j))
                 plt.close()
             gen.train()
+
+if __name__ == "__main__":
+    app.run(main)

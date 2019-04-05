@@ -94,14 +94,15 @@ class Path(nn.Module):
         tap = self.conv1(x)
 
         for i in range(self.num_blocks):
-            tap = F.avg_pool1d(self.blocks[i](tap), 2, 2)
+            #tap = F.avg_pool1d(self.blocks[i](tap), 2, 2)
+            tap = self.blocks[i](tap)
             tap = F.relu(self.convs[i](tap))
 
         return tap
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=2, num_channels=[32, 32, 64, 128, 128]):
+    def __init__(self, in_channels=2, num_channels=[32, 32, 32, 32, 32]):
         super(Discriminator, self).__init__()
         self.a = Path(in_channels=in_channels, num_channels=num_channels)
         self.b = Path(in_channels=in_channels, num_channels=num_channels)

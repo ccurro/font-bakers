@@ -29,10 +29,10 @@ class StyleBlock(nn.Module):
         self.init_width = init_width
         if initial:
             self.initial = nn.parameter.Parameter(
-                torch.randn(1, num_channels, init_width), requires_grad=True)
+                torch.ones(1, num_channels, init_width), requires_grad=True)
 
-        self.noise_gain = nn.parameter.Parameter(
-            torch.zeros(1, num_channels, 1), requires_grad=True)
+        #self.noise_gain = nn.parameter.Parameter(
+        #    torch.zeros(1, num_channels, 1), requires_grad=True)
 
         self.conv1 = nn.Conv1d(
             num_channels,
@@ -53,9 +53,9 @@ class StyleBlock(nn.Module):
         gains = gains_and_biases[:, :self.num_channels].unsqueeze(-1)
         biases = gains_and_biases[:, self.num_channels:].unsqueeze(-1)
 
-        noise = self.noise_gain * torch.randn(self.noise_gain.shape)
+        #noise = self.noise_gain * torch.randn(self.noise_gain.shape)
 
-        return AdaIN(F.relu(a + noise), gains, biases)
+        return AdaIN(F.leaky_relu(a, 0.2), gains, biases)
 
 
 class MappingNet(nn.Module):
@@ -112,6 +112,8 @@ class StyleNet(nn.Module):
 
         return torch.cat(
             [torch.roll(implicits[:, 2:, :], 1, dims=-1), implicits], dim=1)
+
+        return a
 
 
 if __name__ == '__main__':
