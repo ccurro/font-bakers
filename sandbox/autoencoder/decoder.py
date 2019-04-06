@@ -63,7 +63,7 @@ class Decoder(nn.Module):
             [Block(c, kernel_size) for c in num_channels])
 
         self.conv_out = nn.Conv1d(
-            num_channels[-1], 6, kernel_size=1)
+            num_channels[-1], 3*4, kernel_size=1)
 
         self.called = False
 
@@ -79,8 +79,10 @@ class Decoder(nn.Module):
         if not self.called:
             print(a.shape)
             self.called = True
-            
-        return self.conv_out(a).reshape(a.shape[0], 3, 2, -1)
+
+        a = self.conv_out(a).reshape(a.shape[0], 3, 4, -1)
+                    
+        return torch.cat([torch.roll(a[:, :, 2:, :], 1, dims=-1), a], dim=2)
 
 
 if __name__ == "__main__":

@@ -65,7 +65,7 @@ class Encoder(nn.Module):
 
         self.pooling = pooling
 
-        self.fc = nn.Linear(256*2*2, 160)
+        self.fc = nn.Linear(256*2*2, 32)
 
         self.called = False
 
