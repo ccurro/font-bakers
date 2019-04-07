@@ -12,6 +12,8 @@ from decoder import Decoder
 
 from data import Dataset
 
+from scipy.stats import shapiro
+
 import matplotlib 
 matplotlib.use('Agg') 
 
@@ -62,8 +64,11 @@ for j in range(300):
         samples_hat = sample_qb(bezier_hat, int(num_samples / num_curves))
         mse = (samples - samples_hat)**2
         mse = torch.mean(mse)
-        adv = disc(code).mean()        
+        adv = disc(code).mean()
+        
+        print(shapiro(code.cpu().detach().numpy().flatten()))
         print(j, i, mse.cpu().detach().numpy(), adv.cpu().detach().numpy())
+        
         (mse - 0.01*adv).backward(retain_graph=True)
         opt.step()
         

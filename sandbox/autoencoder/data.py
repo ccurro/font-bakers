@@ -10,7 +10,7 @@ from imageio import imread
 
 
 class Dataset(data.Dataset):
-    def __init__(self, path):
+    def __init__(self, path, conditional=False):
         count_file = [
             f for f in os.listdir(path)
             if os.path.isfile(os.path.join(path, f))
@@ -23,6 +23,7 @@ class Dataset(data.Dataset):
         assert len(count_file) == 1
 
         self.path = path
+        self.conditional = conditional
         self.num_examples = int(count_file[0])
         self.num_shards = len(shards)
 
@@ -36,10 +37,19 @@ class Dataset(data.Dataset):
         contour_file = os.path.join(
             self.path, "shard_{}/{}.pts.npy".format(index % self.num_shards,
                                                     index))
+        
+        if conditional:
+            cat_file = os.path.join(
+                self.path, "shard_{}/{}.cat".format(index % self.num_shards,
+                                                    index))
+            with open(cat_file, 'r') as f:
+                category = read(f)
+        else:
+            category = None
 
         return np.load(contour_file).transpose(0, 2, 1), (
             np.array(imread(image_file)).transpose(2, 0, 1) / 256.).astype(
-                np.float32)
+                np.float32), category
 
 
 if __name__ == "__main__":
