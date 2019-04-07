@@ -30,11 +30,11 @@ class Dataset(data.Dataset):
             if os.path.isdir(os.path.join(path, f))
         ]
 
-        assert len(count_file) == 1
+        #assert len(count_file) == 1
 
         self.path = path
         self.conditional = conditional
-        self.num_examples = int(count_file[0])
+        self.num_examples = 1000000 #int(count_file[0])
         self.num_shards = len(shards)
 
     def __len__(self):

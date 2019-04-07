@@ -40,6 +40,7 @@ class MiniBlock(nn.Module):
 class ConditionalMiniBlock(nn.Module):
     def __init__(self, num_channels, kernel_size, num_classes):
         super(ConditionalMiniBlock, self).__init__()
+        self.num_channels = num_channels
 
         self.conv1 = nn.Conv1d(
             num_channels, num_channels, kernel_size, bias=False, padding=(kernel_size - 1) // 2)
@@ -56,10 +57,14 @@ class ConditionalMiniBlock(nn.Module):
         gains = self.gains(category)
         biases = self.biases(category)
         
-        a = F.relu(AdaIN(x, gains[:num_channels], biases[:num_channels]))
+        a = F.relu(AdaIN(x,
+            gains[:,:self.num_channels].view(-1,self.num_channels,1),
+            biases[:,:self.num_channels].view(-1, self.num_channels,1)))
         a = self.conv1(a)
 
-        a = F.relu(AdaIN(x, gains[num_channels:], biases[num_channels:]))        
+        a = F.relu(AdaIN(x, gains[:, self.num_channels:].view(-1,
+            self.num_channels,1),
+            biases[:,self.num_channels:].view(-1, self.num_channels,1)))        
         a = self.conv2(a)
 
         return a + x
