@@ -40,7 +40,7 @@ def sample_qb(control_points, steps):
 
     return samples
 
-ds = Dataset("../pil/renders/160_samples/")
+ds = Dataset("../pil/renders/160_samples/", conditional=False)
 dl = torch.utils.data.DataLoader(ds, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
 #samples, image = next(iter(dl))
 
@@ -51,10 +51,10 @@ enc = Encoder(pooling=nn.MaxPool2d(2,2))
 dec = Decoder()
 disc = Discriminator(num_curves)
 opt = optim.Adam(list(enc.parameters()) + list(dec.parameters()), 1e-3)
-disc_opt = optim.Adam(disc.parameters(), 1e-3)
+disc_opt = optim.Adam(disc.parameters(), 1e-2)
 
 for j in range(300):
-    for i, (samples, image) in enumerate(dl):
+    for i, (samples, image, _) in enumerate(dl):
         samples = samples.cuda()
         image = image.cuda()
         
@@ -66,10 +66,9 @@ for j in range(300):
         mse = torch.mean(mse)
         adv = disc(code).mean()
         
-        print(shapiro(code.cpu().detach().numpy().flatten()))
-        print(j, i, mse.cpu().detach().numpy(), adv.cpu().detach().numpy())
+        code_samples = code.cpu().detach().numpy().flatten()
         
-        (mse - 0.01*adv).backward(retain_graph=True)
+        (mse - 0.5*adv).backward(retain_graph=True)
         opt.step()
         
         disc_opt.zero_grad()
@@ -81,7 +80,14 @@ for j in range(300):
         disc_loss.backward(torch.ones(1))
         disc_opt.step()
 
+        print(j, i,
+              mse.cpu().detach().numpy(),
+              adv.cpu().detach().numpy(),
+              disc_loss.cpu().detach().numpy()
+        )        
+
         if i % 100 == 0:
+            dec.eval()
             bezier_hat = dec(torch.randn(code.unsqueeze(1).shape))
             samples_hat = sample_qb(bezier_hat, int(num_samples / num_curves))
             z1 = samples_hat[0,0].cpu().detach().numpy()
@@ -96,8 +102,10 @@ for j in range(300):
             #z = samples_hat[0,2].cpu().detach().numpy()
             #plt.plot(z[0,:], z[1,:])
             plt.axis('off')
-            plt.savefig("yo/{}_{}.pdf".format(j, i))
+            plt.savefig("yo/pdf/{}_{}.pdf".format(j, i))
+            plt.savefig("yo/png/{}_{}.png".format(j, i))            
             plt.close()
+            dec.train()
         
 
 

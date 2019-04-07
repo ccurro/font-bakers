@@ -8,6 +8,16 @@ import torch
 from torch.utils import data
 from imageio import imread
 
+chars = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+    'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+    't', 'u', 'v', 'w', 'x', 'y', 'z', 'zero', 'one', 'two', 'three', 'four',
+    'five', 'six', 'seven', 'eight', 'nine', 'exclam', 'numbersign', 'dollar',
+    'percent', 'ampersand', 'asterisk', 'question', 'at'
+]
+
+char_dict = dict(zip(chars, range(len(chars))))
 
 class Dataset(data.Dataset):
     def __init__(self, path, conditional=False):
@@ -38,14 +48,14 @@ class Dataset(data.Dataset):
             self.path, "shard_{}/{}.pts.npy".format(index % self.num_shards,
                                                     index))
         
-        if conditional:
+        if self.conditional:
             cat_file = os.path.join(
                 self.path, "shard_{}/{}.cat".format(index % self.num_shards,
                                                     index))
             with open(cat_file, 'r') as f:
-                category = read(f)
+                category = char_dict[f.read()]
         else:
-            category = None
+            category = []
 
         return np.load(contour_file).transpose(0, 2, 1), (
             np.array(imread(image_file)).transpose(2, 0, 1) / 256.).astype(

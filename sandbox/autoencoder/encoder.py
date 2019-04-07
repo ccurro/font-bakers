@@ -6,6 +6,8 @@ import torch.nn.functional as F
 
 import numpy as np
 
+from CoordConv import CoordConv
+
 
 class MiniBlock(nn.Module):
     def __init__(self, num_channels, kernel_size):
@@ -52,7 +54,7 @@ class Encoder(nn.Module):
                  pooling=None):
         super(Encoder, self).__init__()
 
-        self.conv1 = nn.Conv2d(
+        self.conv1 = CoordConv(
             in_channels, num_channels[0], kernel_size=kernel_size, padding=(kernel_size - 1) // 2)
 
         self.transitions = nn.ModuleDict(
@@ -67,6 +69,8 @@ class Encoder(nn.Module):
         self.pooling = pooling
 
         self.fc = nn.Linear(256*2*2, 16)
+        
+        self.bn_out = nn.BatchNorm1d(16, affine=False)
 
         self.called = False
 
@@ -86,7 +90,7 @@ class Encoder(nn.Module):
             print(a.shape)
             self.called = True
             
-        return self.fc(a.reshape(a.shape[0], -1))
+        return self.bn_out(self.fc(a.reshape(a.shape[0], -1)))
 
 class Discriminator(nn.Module):
     def __init__(self, code_size=16):

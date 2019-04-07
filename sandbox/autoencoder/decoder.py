@@ -128,7 +128,7 @@ class Decoder(nn.Module):
         a = self.conv1(x)
 
         for i, block in enumerate(self.blocks):
-            a = block(a, category)
+            a = block(a, category=category)
             if str(i) in self.transitions:
                 transition = self.transitions[str(i)]
                 a = transition(a)
