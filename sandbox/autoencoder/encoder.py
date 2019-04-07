@@ -48,6 +48,7 @@ class Encoder(nn.Module):
                  in_channels=3,
                  num_channels=[16, 32, 32, 64, 64, 128, 256],
                  kernel_size=3,
+                 code_size=16,
                  pooling=None):
         super(Encoder, self).__init__()
 
@@ -86,6 +87,25 @@ class Encoder(nn.Module):
             self.called = True
             
         return self.fc(a.reshape(a.shape[0], -1))
+
+class Discriminator(nn.Module):
+    def __init__(self, code_size=16):
+        super(Discriminator, self).__init__()
+
+        num_features = 128
+        
+        self.fc1 = nn.Linear(code_size, num_features)
+        self.fc2 = nn.Linear(num_features, 1)
+
+        for m in self.modules():
+            if 'weight' in m._parameters:
+                nn.utils.spectral_norm(m)
+
+    def forward(self, x):
+        x = x.squeeze()
+        a = F.relu(self.fc1(x))
+
+        return self.fc2(a)
 
 
 if __name__ == "__main__":
