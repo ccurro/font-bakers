@@ -54,7 +54,7 @@ for j in range(300):
         opt.zero_grad()
         code = enc(image)
         bezier_hat = dec(code.unsqueeze(1))
-        samples_hat = sample_qb(bezier_hat, 5)
+        samples_hat = sample_qb(bezier_hat, 10)
         mse = (samples - samples_hat)**2
         mse = torch.mean(mse)
         print(j, i, mse.cpu().detach().numpy())
@@ -62,13 +62,19 @@ for j in range(300):
         opt.step()
 
         if i % 100 == 0:
-            z = samples_hat[0,0].cpu().detach().numpy()
-            plt.plot(z[0,:], z[1,:])
-            z = samples_hat[0,1].cpu().detach().numpy()
-            plt.plot(z[0,:], z[1,:])
-            z = samples_hat[0,2].cpu().detach().numpy()
-            plt.plot(z[0,:], z[1,:])
-            plt.savefig("yo/{}_{}.png".format(j, i))
+            z1 = samples_hat[0,0].cpu().detach().numpy()
+            #plt.plot(z[0,:], z[1,:])
+            
+            z2 = samples_hat[0,1].cpu().detach().numpy()
+            #plt.plot(z[0,:], z[1,:])
+
+            plt.fill(z1[0,:], z1[1,:], 'black', z2[0,:], z2[1,:], 'white')
+
+            
+            #z = samples_hat[0,2].cpu().detach().numpy()
+            #plt.plot(z[0,:], z[1,:])
+            plt.axis('off')
+            plt.savefig("yo/{}_{}.pdf".format(j, i))
             plt.close()
         
 
